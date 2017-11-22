@@ -14,9 +14,9 @@ def resize_array(x, size):
 
 def img2array(data_path, desired_size=None, expand=False, view=False):
     """
-    Util function for loading RGB image into 4D numpy array.
+    Util function for loading RGB image into a numpy array.
 
-    Returns array of shape (1, H, W, C)
+    Returns array of shape (1, H, W, C).
     """
     img = Image.open(data_path)
     img = img.convert('RGB')
