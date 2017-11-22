@@ -5,8 +5,10 @@ from utils import img2array
 from modules import spatial_glimpse
 
 
-TEST_GLIMPSE = False
+TEST_GLIMPSE = True
 TEST_BOUNDING = True
+plot_dir = './plots/'
+data_dir = './data/'
 
 
 def denormalize(T, x, y):
@@ -25,7 +27,7 @@ def bounding_box(x, y, size):
 
 def main():
 
-    img_path = './lenna.jpg'
+    img_path = data_dir + './lenna.jpg'
     img = img2array(img_path)
 
     if TEST_GLIMPSE:
@@ -40,7 +42,7 @@ def main():
             plt.imshow(glimpse[i])
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
-        plt.savefig('/Users/kevin/Desktop/glimpses.png', format='png', dpi=300,
+        plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
                     bbox_inches='tight')
         plt.show()
 
@@ -54,6 +56,10 @@ def main():
             rect = bounding_box(x, y, size)
             ax.add_patch(rect)
             size = size * 2
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
+                    bbox_inches='tight')
         plt.show()
 
 
