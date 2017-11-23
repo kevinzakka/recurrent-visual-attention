@@ -6,23 +6,23 @@ from utils import img2array
 from modules import glimpse_sensor
 
 
-TEST_GLIMPSE = True
-TEST_BOUNDING = False
+TEST_GLIMPSE = False
+TEST_BOUNDING = True
 plot_dir = './plots/'
 data_dir = './data/'
 
 
-def denormalize(T, x, y):
-    x_original = int((T/2)*x + (T/2))
-    y_original = int((T/2)*y + (T/2))
-    return x_original, y_original
+def denormalize(T, coords):
+    x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
+    y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
+    return torch.stack([x_original, y_original])
 
 
-def bounding_box(x, y, size):
+def bounding_box(x, y, size, color='w'):
     x = int(x - (size / 2))
     y = int(y - (size / 2))
     rect = patches.Rectangle((x, y), size, size, linewidth=1,
-                             edgecolor='w', fill=False)
+                             edgecolor=color, fill=False)
     return rect
 
 
@@ -43,7 +43,7 @@ def main():
         glimpse = sensor.extract(imgs, loc).numpy()
 
         rows, cols = glimpse.shape[0], glimpse.shape[1]
-        fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(8, 2))
+        fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(5, 2))
         for i in range(rows):
             for j in range(cols):
                 axs[i, j].imshow(glimpse[i, j, :])
@@ -55,16 +55,18 @@ def main():
 
     if TEST_BOUNDING:
 
-        fig, ax = plt.subplots(1)
-        x, y = denormalize(img.shape[1], 0, 0)
-        ax.imshow(img)
-        size = 64
-        for i in range(3):
-            rect = bounding_box(x, y, size)
-            ax.add_patch(rect)
-            size = size * 2
-        ax.get_xaxis().set_visible(False)
-        ax.get_yaxis().set_visible(False)
+        fig, ax = plt.subplots(nrows=1, ncols=2)
+        coords = denormalize(imgs.shape[1], loc)
+        imgs = imgs.numpy()
+        for i in range(len(imgs)):
+            ax[i].imshow(imgs[i])
+            size = 64
+            for j in range(3):
+                rect = bounding_box(coords[i, 0], coords[i, 1], size)
+                ax[i].add_patch(rect)
+                size = size * 2
+            ax[i].get_xaxis().set_visible(False)
+            ax[i].get_yaxis().set_visible(False)
         plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
                     bbox_inches='tight')
         plt.show()
