@@ -10,8 +10,11 @@
 
 ## ToDo
 
-[x] Glimpse Sensor
-[x] Glimpse Network
-[x] Core Network
-[ ] Location Network
-[x] Action Network
+- [x] Glimpse Sensor
+- [x] Glimpse Network
+- [x] Core Network
+- [ ] Location Network
+- [x] Action Network
+- [ ] RAM (putting all the pieces together)
+- [ ] training loop
+- [ ] config file
