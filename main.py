@@ -1,12 +1,13 @@
+import torch
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 from utils import img2array
-from modules import spatial_glimpse
+from modules import glimpse_sensor
 
 
 TEST_GLIMPSE = True
-TEST_BOUNDING = True
+TEST_BOUNDING = False
 plot_dir = './plots/'
 data_dir = './data/'
 
@@ -29,11 +30,12 @@ def main():
 
     img_path = data_dir + './lenna.jpg'
     img = img2array(img_path)
+    img = torch.from_numpy(img)
 
     if TEST_GLIMPSE:
 
-        sensor = spatial_glimpse(g=64, k=3, s=2)
-        glimpse = sensor.extract(img, [0, 0])
+        sensor = glimpse_sensor(g=64, k=3, s=2)
+        glimpse = sensor.extract(img, [0, 0]).numpy()
 
         N = glimpse.shape[0]
         plt.figure(figsize=(8, 2))

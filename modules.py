@@ -1,9 +1,13 @@
 import numpy as np
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 from utils import resize_array
 
 
-class spatial_glimpse(object):
+class glimpse_sensor(object):
     """
     Bandwidth-limited sensor that extracts
     a retina-like representation phi around
@@ -45,12 +49,18 @@ class spatial_glimpse(object):
             # scale the patch size
             size = int(self.s * size)
 
+        # convert to numpy array to resize
+        patches = [p.numpy() for p in patches]
+
         # resize the patches to squares of size g
         patches = [resize_array(p, self.g) if p.shape[0] != self.g
                    else np.expand_dims(p, axis=0) for p in patches]
 
         # concatenate into single vector
         patches = np.concatenate(patches)
+
+        # convert to torch tensor
+        patches = torch.from_numpy(patches)
 
         return patches
 
@@ -61,7 +71,7 @@ class spatial_glimpse(object):
 
     def _extract_single_patch(self, x, center, size):
         # compute unnormalized coords of patch center
-        height, width = self._denormalize(x.shape[1], *center)
+        height, width = self._denormalize(x.size()[1], *center)
 
         # compute equivalent coords in original img
         patch_x = int(height - (size / 2))
@@ -71,3 +81,15 @@ class spatial_glimpse(object):
         patch = x[patch_x:patch_x+size, patch_y:patch_y+size, :]
 
         return patch
+
+
+class glimpse_network(nn.Module):
+    """
+
+    """
+
+    def __init__(self):
+        super(glimpse_network, self).__init__()
+
+    def forward(self, x):
+        pass
