@@ -28,22 +28,27 @@ def bounding_box(x, y, size):
 
 def main():
 
-    img_path = data_dir + './lenna.jpg'
-    img = img2array(img_path)
-    img = torch.from_numpy(img)
+    imgs = []
+    paths = [data_dir + './lenna.jpg', data_dir + './cat.jpg']
+    for i in range(len(paths)):
+        img = img2array(paths[i], desired_size=[512, 512], expand=True)
+        imgs.append(torch.from_numpy(img))
+    imgs = torch.cat(imgs)
+
+    loc = torch.LongTensor([[0, 0], [0, 0]])
 
     if TEST_GLIMPSE:
 
         sensor = glimpse_sensor(g=64, k=3, s=2)
-        glimpse = sensor.extract(img, [0, 0]).numpy()
+        glimpse = sensor.extract(imgs, loc).numpy()
 
-        N = glimpse.shape[0]
-        plt.figure(figsize=(8, 2))
-        for i in range(N):
-            ax = plt.subplot(1, N, i+1)
-            plt.imshow(glimpse[i])
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+        rows, cols = glimpse.shape[0], glimpse.shape[1]
+        fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(8, 2))
+        for i in range(rows):
+            for j in range(cols):
+                axs[i, j].imshow(glimpse[i, j, :])
+                axs[i, j].get_xaxis().set_visible(False)
+                axs[i, j].get_yaxis().set_visible(False)
         plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
                     bbox_inches='tight')
         plt.show()

@@ -8,12 +8,30 @@ def str2bool(v):
 
 
 def resize_array(x, size):
+    # 3D and 4D tensors allowed only
+    assert x.ndim in [3, 4], "Only 3D and 4D Tensors allowed!"
+
+    # 4D Tensor
+    if x.ndim == 4:
+        res = []
+        for i in range(x.shape[0]):
+            img = array2img(x[i])
+            img = img.resize((size, size))
+            img = np.asarray(img, dtype='float32')
+            img = np.expand_dims(img, axis=0)
+            img /= 255.0
+            res.append(img)
+        res = np.concatenate(res)
+        res = np.expand_dims(res, axis=1)
+        return res
+
+    # 3D Tensor
     img = array2img(x)
     img = img.resize((size, size))
-    x = np.asarray(img, dtype='float32')
-    x = np.expand_dims(x, axis=0)
-    x /= 255.0
-    return x
+    res = np.asarray(img, dtype='float32')
+    res = np.expand_dims(res, axis=0)
+    res /= 255.0
+    return res
 
 
 def img2array(data_path, desired_size=None, expand=False, view=False):

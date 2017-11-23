@@ -22,10 +22,11 @@ class glimpse_sensor(object):
 
     Args
     ----
-    - x: an 3D tensor of shape (H, W, C).
-    - l: (x, y) coordinates in the range [-1, 1] with the
-         center corresponding to (0, 0) and the top left
-         corner corresponding to (-1, -1).
+    - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
+    - l: a minibatch of (x, y) coordinates in the range [-1, 1]
+         with the center corresponding to (0, 0) and the top left
+         corner corresponding to (-1, -1). l is a 2D Tensor of shape
+         (B, 2).
     - g: height and width of the first extracted patch.
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
@@ -53,29 +54,49 @@ class glimpse_sensor(object):
         phi = [p.numpy() for p in phi]
 
         # resize the patches to squares of size g
-        phi = [resize_array(p, self.g) if p.shape[0] != self.g
-               else np.expand_dims(p, axis=0) for p in phi]
+        phi = [resize_array(p, self.g) if p.shape[1] != self.g
+               else np.expand_dims(p, 1) for p in phi]
 
         # concatenate into single vector
-        phi = torch.from_numpy(np.concatenate(phi))
+        phi = torch.from_numpy(np.concatenate(phi, 1))
 
         return phi
 
-    def _denormalize(self, T, x, y):
-        x_original = int((T/2)*x + (T/2))
-        y_original = int((T/2)*y + (T/2))
-        return x_original, y_original
+    def _denormalize(self, T, coords):
+        x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
+        y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
+        return torch.stack([x_original, y_original])
 
     def _extract_single_patch(self, x, center, size):
+        """
+        Extract a single patch for each image in the minibatch
+        x, centered at the coordinates `center` and of size `size`.
+
+        Args
+        ----
+        - x: a 4D Tensor of shape (B, H, W, C).
+        - center: a 2D Tensor of shape (B, 2).
+        - size: a scalar defining the size of the extracted patch.
+
+        Returns
+        -------
+        - patch: a 4D Tensor of shape (B, size, size, C)
+        """
+
         # compute unnormalized coords of patch center
-        height, width = self._denormalize(x.size()[1], *center)
+        coords = self._denormalize(x.size()[1], center)
 
         # compute equivalent coords in original img
-        patch_x = int(height - (size / 2))
-        patch_y = int(width - (size / 2))
+        patch_x = coords[:, 0] - (size // 2)
+        patch_y = coords[:, 1] - (size // 2)
 
-        # extract patch
-        patch = x[patch_x:patch_x+size, patch_y:patch_y+size, :]
+        # extract patch (need to vectorize this)
+        patch = []
+        for i in range(x.size()[0]):
+            p = x[i].unsqueeze(0)
+            p = p[:, patch_x[i]:patch_x[i]+size, patch_y[i]:patch_y[i]+size, :]
+            patch.append(p)
+        patch = torch.cat(patch)
 
         return patch
 
