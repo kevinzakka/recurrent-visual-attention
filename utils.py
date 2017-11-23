@@ -3,6 +3,10 @@ import numpy as np
 from PIL import Image
 
 
+def str2bool(v):
+    return v.lower() in ('true', '1')
+
+
 def resize_array(x, size):
     img = array2img(x)
     img = img.resize((size, size))

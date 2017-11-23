@@ -32,7 +32,7 @@ class glimpse_sensor(object):
 
     Returns
     -------
-    - glimpse: foveated glimpse of an image at a given location.
+    - phi: foveated glimpse of an image at a given location.
     """
 
     def __init__(self, g=256, k=3, s=2):
@@ -41,28 +41,25 @@ class glimpse_sensor(object):
         self.s = s
 
     def extract(self, x, l):
-        patches = []
+        phi = []
         size = self.g
         for i in range(self.k):
             # extract the patch
-            patches.append(self._extract_single_patch(x, l, size))
+            phi.append(self._extract_single_patch(x, l, size))
             # scale the patch size
             size = int(self.s * size)
 
         # convert to numpy array to resize
-        patches = [p.numpy() for p in patches]
+        phi = [p.numpy() for p in phi]
 
         # resize the patches to squares of size g
-        patches = [resize_array(p, self.g) if p.shape[0] != self.g
-                   else np.expand_dims(p, axis=0) for p in patches]
+        phi = [resize_array(p, self.g) if p.shape[0] != self.g
+               else np.expand_dims(p, axis=0) for p in phi]
 
         # concatenate into single vector
-        patches = np.concatenate(patches)
+        phi = torch.from_numpy(np.concatenate(phi))
 
-        # convert to torch tensor
-        patches = torch.from_numpy(patches)
-
-        return patches
+        return phi
 
     def _denormalize(self, T, x, y):
         x_original = int((T/2)*x + (T/2))
@@ -85,11 +82,44 @@ class glimpse_sensor(object):
 
 class glimpse_network(nn.Module):
     """
+    A trainable, bandwidth-limited sensor that mimics
+    attention by producing a glimpse representation g_t.
 
+    Feeds the output of the glimpse_sensor to a fc layer h_,
+    the glimpse location l to a fc layer, and applies a
+    ReLU nonlinearity to their sum.
+
+    In other words:
+
+        `g_t = relu( fc(l) + fc(phi) )`
+
+    Args
+    ----
+    - h_g: hidden layer size of the fc layer for phi.
+    - h_l: hidden layer size of the fc layer for l.
+    - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
+    - l: the location vector containing the glimpse coordinates [x, y].
+
+    Returns
+    -------
+    - g_t: glimpse representation vector.
     """
 
-    def __init__(self):
+    def __init__(self, h_g, h_l, g, k, s):
         super(glimpse_network, self).__init__()
+        self.sensor = glimpse_sensor(g, k, s)
+        self.fc1 = nn.Linear(g, h_g)
+        self.fc2 = nn.Linear(2, h_l)
 
-    def forward(self, x):
-        pass
+    def forward(self, x, l):
+        # compute phi
+        phi = self.sensor.extract(x, l)
+
+        # feed phi and l to respective fc layers
+        phi_out = F.relu(self.fc1(phi))
+        l_out = F.relu(self.fc2(l))
+
+        # sum and apply nonlinearity
+        g_t = F.relu(phi_out + l_out)
+
+        return g_t
