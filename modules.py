@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 from utils import resize_array
 
@@ -36,7 +37,7 @@ class glimpse_sensor(object):
     - phi: foveated glimpse of an image at a given location.
     """
 
-    def __init__(self, g=256, k=3, s=2):
+    def __init__(self, g, k, s):
         self.g = g
         self.k = k
         self.s = s
@@ -108,11 +109,13 @@ class glimpse_network(nn.Module):
 
     Feeds the output of the glimpse_sensor to a fc layer h_,
     the glimpse location l to a fc layer, and applies a
-    ReLU nonlinearity to their sum.
+    ReLU nonlinearity to their concatenation.
 
     In other words:
 
-        `g_t = relu( fc(l) + fc(phi) )`
+        `g_t = relu( fc(l) || fc(phi) )`
+
+    where `||` signifies a concatenation.
 
     Args
     ----
@@ -126,7 +129,7 @@ class glimpse_network(nn.Module):
     - g_t: glimpse representation vector.
     """
 
-    def __init__(self, h_g, h_l, g, k, s):
+    def __init__(self, h_g=128, h_l=128, g=256, k=3, s=2):
         super(glimpse_network, self).__init__()
         self.sensor = glimpse_sensor(g, k, s)
         self.fc1 = nn.Linear(g, h_g)
@@ -140,7 +143,93 @@ class glimpse_network(nn.Module):
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l))
 
-        # sum and apply nonlinearity
-        g_t = F.relu(phi_out + l_out)
+        # concatenate and apply nonlinearity
+        g_t = F.relu(torch.cat([phi_out, l_out]))
 
         return g_t
+
+
+class core_network(nn.Module):
+    """
+    A RNN which maintains an internal state that summarizes
+    the information extracted from the history of past
+    observations.
+
+    It encodes the agent's knowledge of the environment and
+    is instrumental in deciding how to act and where to deploy
+    the sensor.
+
+    Concretely, takes the glimpse representation g_t as input,
+    and combines it with its interal representation h_t_prev at
+    the previous time step, to produce the new internal state h_t.
+
+    In other words:
+
+        `h_t = relu( fc(h_t_prev) + fc(g_t) )`
+
+    There is no `LSTM` or `GRU` cell in PyTorch with a ReLU
+    nonlinearity so this will fall back to the `tanh` activation.
+
+    Args
+    ----
+    - g_t: the glimpse representation returned by the glimpse network.
+    - h_t_prev: internal representatino at time step t-1.
+
+    Returns
+    -------
+    - h_t: internal representation at time step t.
+    """
+
+    def __init__(self, input_size=256, hidden_size=256):
+        super(core_network, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.rnn = nn.LSTM(input_size, hidden_size, 1)
+
+    def forward(self, x, h_t_prev):
+        x = torch.unsqueeze(x, 0)
+        _, h_t = self.rnn(x, h_t_prev)
+        return h_t
+
+    def init_hidden(self, batch_size):
+        return (
+            Variable(torch.zeros(1, batch_size, self.hidden_size)),
+            Variable(torch.zeros(1, batch_size, self.hidden_size))
+        )
+
+
+class action_network(nn.Module):
+    """
+    Uses the internal state h_t of the core network to
+    produce an action/classification.
+
+    Concretely, feeds the vector h_t through a fc layer
+    and applies a softmax at the output to produce a set
+    of probabilities over the output classes.
+
+    Args
+    ----
+    - input_size: input size of the fc layer.
+    - num_classes: output size of the fc layer.
+    - x: the hidden state vector h_t.
+    """
+
+    def __init__(self, input_size, num_classes):
+        super(action_network, self).__init__()
+        self.fc = nn.Linear(input_size, num_classes)
+
+    def forward(self, x):
+        return F.softmax(self.fc(x))
+
+
+class location_network(nn.Module):
+    """
+    Uses the internal state h_t of the core network to
+    produce the next location to attend to l_t.
+    """
+
+    def __init__(self):
+        super(location_network, self).__init__()
+
+    def forward(self, x):
+        pass
