@@ -6,7 +6,6 @@ import torch.nn.functional as F
 
 from utils import resize_array
 from torch.autograd import Variable
-from torch.distributions import Normal
 
 
 class glimpse_sensor(object):
@@ -43,12 +42,12 @@ class glimpse_sensor(object):
         self.k = k
         self.s = s
 
-    def extract(self, x, l):
+    def __call__(self, x, l):
         phi = []
         size = self.g
         for i in range(self.k):
             # extract the patch
-            phi.append(self._extract_single_patch(x, l, size))
+            phi.append(self.extract_single_patch(x, l, size))
             # scale the patch size
             size = int(self.s * size)
 
@@ -64,12 +63,12 @@ class glimpse_sensor(object):
 
         return phi
 
-    def _denormalize(self, T, coords):
+    def denormalize(self, T, coords):
         x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
         y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
         return torch.stack([x_original, y_original])
 
-    def _extract_single_patch(self, x, center, size):
+    def extract_single_patch(self, x, center, size):
         """
         Extract a single patch for each image in the minibatch
         x, centered at the coordinates `center` and of size `size`.
@@ -86,7 +85,7 @@ class glimpse_sensor(object):
         """
 
         # compute unnormalized coords of patch center
-        coords = self._denormalize(x.size()[1], center)
+        coords = self.denormalize(x.size()[1], center)
 
         # compute equivalent coords in original img
         patch_x = coords[:, 0] - (size // 2)
@@ -172,7 +171,7 @@ class core_network(nn.Module):
     Args
     ----
     - g_t: the glimpse representation returned by the glimpse network.
-    - h_t_prev: internal representatino at time step t-1.
+    - h_t_prev: internal representatino at time step (t - 1).
 
     Returns
     -------
@@ -185,9 +184,9 @@ class core_network(nn.Module):
         self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, 1)
 
-    def forward(self, x, h_t_prev):
-        x = torch.unsqueeze(x, 0)
-        _, h_t = self.rnn(x, h_t_prev)
+    def forward(self, g_t, h_t_prev):
+        g_t = torch.unsqueeze(g_t, 0)
+        _, h_t = self.rnn(g_t, h_t_prev)
         return h_t
 
     def init_hidden(self, batch_size):
@@ -210,7 +209,8 @@ class action_network(nn.Module):
     ----
     - input_size: input size of the fc layer.
     - num_classes: output size of the fc layer.
-    - x: the hidden state vector h_t.
+    - h_t: the hidden state vector of the core network at
+           time step t.
     """
 
     def __init__(self, input_size, num_classes):
@@ -225,19 +225,25 @@ class location_network(nn.Module):
     """
     Uses the internal state h_t of the core network to
     produce a 2D vector of means used to parametrize the
-    policy for the locations l. The policy itself is a 
+    policy for the locations l. The policy itself is a
     two-component Gaussian with a fixed variance.
 
     Args
     ----
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
+    - h_t: the hidden state vector of the core network at
+           time step t.
+
+    Returns
+    -------
+    - mean: a 2D vector of size (B, 2).
     """
 
     def __init__(self, input_size, output_size=2):
         super(location_network, self).__init__()
         self.fc = nn.Linear(input_size, output_size)
 
-    def forward(self, x):
-        return F.tanh(self.fc(x))
-
+    def forward(self, h_t):
+        mean = F.tanh(self.fc(h_t))
+        return mean
