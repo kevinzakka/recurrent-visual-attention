@@ -3,9 +3,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from utils import resize_array
+from torch.autograd import Variable
+from torch.distributions import Normal
 
 
 class glimpse_sensor(object):
@@ -153,13 +154,11 @@ class core_network(nn.Module):
     """
     A RNN which maintains an internal state that summarizes
     the information extracted from the history of past
-    observations.
+    observations. It encodes the agent's knowledge of the
+    environment through a state vector h that gets updated
+    at every time step t.
 
-    It encodes the agent's knowledge of the environment and
-    is instrumental in deciding how to act and where to deploy
-    the sensor.
-
-    Concretely, takes the glimpse representation g_t as input,
+    Concretely, it takes the glimpse representation g_t as input,
     and combines it with its interal representation h_t_prev at
     the previous time step, to produce the new internal state h_t.
 
@@ -201,11 +200,11 @@ class core_network(nn.Module):
 class action_network(nn.Module):
     """
     Uses the internal state h_t of the core network to
-    produce an action/classification.
+    produce the final output classification.
 
-    Concretely, feeds the vector h_t through a fc layer
-    and applies a softmax at the output to produce a set
-    of probabilities over the output classes.
+    Concretely, feeds the hidden state h_t to a fc
+    layer and applies a softmax to create a vector
+    of output probabilities over the possible classes.
 
     Args
     ----
@@ -225,11 +224,20 @@ class action_network(nn.Module):
 class location_network(nn.Module):
     """
     Uses the internal state h_t of the core network to
-    produce the next location to attend to l_t.
+    produce a 2D vector of means used to parametrize the
+    policy for the locations l. The policy itself is a 
+    two-component Gaussian with a fixed variance.
+
+    Args
+    ----
+    - input_size: input size of the fc layer.
+    - output_size: output size of the fc layer.
     """
 
-    def __init__(self):
+    def __init__(self, input_size, output_size=2):
         super(location_network, self).__init__()
+        self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, x):
-        pass
+        return F.tanh(self.fc(x))
+
