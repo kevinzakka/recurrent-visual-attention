@@ -13,7 +13,7 @@
 - [x] Glimpse Sensor
 - [x] Glimpse Network
 - [x] Core Network
-- [ ] Location Network
+- [x] Location Network
 - [x] Action Network
 - [ ] RAM (putting all the pieces together)
 - [ ] training loop
