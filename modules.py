@@ -67,7 +67,7 @@ class glimpse_sensor(object):
     def denormalize(self, T, coords):
         x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
         y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
-        return torch.stack([x_original, y_original])
+        return torch.stack([x_original, y_original]).long()
 
     def extract_single_patch(self, x, center, size):
         """
@@ -92,12 +92,30 @@ class glimpse_sensor(object):
         patch_x = coords[:, 0] - (size // 2)
         patch_y = coords[:, 1] - (size // 2)
 
-        # extract patch (need to vectorize this)
+        # clip to image bounds
+        patch_x = torch.clamp(patch_x, 0, x.size()[1])
+        patch_y = torch.clamp(patch_y, 0, x.size()[1])
+
+        # extract patch
         patch = []
         for i in range(x.size()[0]):
+            # grab image
             p = x[i].unsqueeze(0)
-            p = p[:, patch_x[i]:patch_x[i]+size, patch_y[i]:patch_y[i]+size, :]
-            patch.append(p)
+
+            # compute slice indices
+            from_x, to_x = patch_x[i], patch_x[i] + size
+            from_y, to_y = patch_y[i], patch_y[i] + size
+
+            # prevent slice error by padding with zeros
+            if (to_x > p.size()[1]) or (to_y > p.size()[1]):
+                pad_dims = [(0, 0), (0, size), (0, size), (0, 0)]
+                p = p.numpy()
+                p = np.pad(p, pad_dims, mode='constant')
+                p = torch.from_numpy(p)
+
+            # slice the patch and append
+            patch.append(p[:, from_x:to_x, from_y:to_y, :])
+
         patch = torch.cat(patch)
 
         return patch
@@ -138,7 +156,7 @@ class glimpse_network(nn.Module):
 
     def forward(self, x, l):
         # compute phi
-        phi = self.sensor.extract(x, l)
+        phi = self.sensor(x, l)
 
         # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
@@ -274,5 +292,5 @@ class Policy(nn.Module):
         self.std = std
 
     def forward(self, mean):
-        l_t_next = Normal(mean, self.std).sample()
+        l_t_next = F.tanh(Normal(mean, self.std).sample())
         return l_t_next

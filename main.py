@@ -6,8 +6,8 @@ from utils import img2array
 from modules import glimpse_sensor
 
 
-TEST_GLIMPSE = False
-TEST_BOUNDING = True
+TEST_GLIMPSE = True
+TEST_BOUNDING = False
 plot_dir = './plots/'
 data_dir = './data/'
 
@@ -35,12 +35,13 @@ def main():
         imgs.append(torch.from_numpy(img))
     imgs = torch.cat(imgs)
 
-    loc = torch.LongTensor([[0, 0], [0, 0]])
+    loc = torch.Tensor(2, 2).uniform_(-1, 1)
+    # loc = torch.LongTensor([[0, 0], [0, 0]])
 
     if TEST_GLIMPSE:
 
         sensor = glimpse_sensor(g=64, k=3, s=2)
-        glimpse = sensor.extract(imgs, loc).numpy()
+        glimpse = sensor(imgs, loc).numpy()
 
         rows, cols = glimpse.shape[0], glimpse.shape[1]
         fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(5, 2))
@@ -49,8 +50,8 @@ def main():
                 axs[i, j].imshow(glimpse[i, j, :])
                 axs[i, j].get_xaxis().set_visible(False)
                 axs[i, j].get_yaxis().set_visible(False)
-        plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
-                    bbox_inches='tight')
+        # plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
+        #             bbox_inches='tight')
         plt.show()
 
     if TEST_BOUNDING:
@@ -67,8 +68,8 @@ def main():
                 size = size * 2
             ax[i].get_xaxis().set_visible(False)
             ax[i].get_yaxis().set_visible(False)
-        plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
-                    bbox_inches='tight')
+        # plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
+        #             bbox_inches='tight')
         plt.show()
 
 
