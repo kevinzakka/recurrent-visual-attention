@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from utils import resize_array
 from torch.autograd import Variable
+from torch.distributions import Normal
 
 
 class glimpse_sensor(object):
@@ -247,3 +248,31 @@ class location_network(nn.Module):
     def forward(self, h_t):
         mean = F.tanh(self.fc(h_t))
         return mean
+
+
+class Policy(nn.Module):
+    """
+    The policy for the locations l is defined as a two-component
+    Gaussian with a fixed variance. The Gaussian is parametrized
+    by the output of the location network.
+
+    TODO: use `.detach()` to stop the gradient flow.
+
+    Args
+    ----
+    - std: fixed std deviation of the location policy.
+    - mean: mean of the location policy returned by the location
+            network.
+
+    Returns
+    -------
+    - l_t_next: the location vector for the next time step.
+    """
+
+    def __init__(self, std):
+        super(Policy, self).__init__()
+        self.std = std
+
+    def forward(self, mean):
+        l_t_next = Normal(mean, self.std).sample()
+        return l_t_next

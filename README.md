@@ -15,6 +15,7 @@
 - [x] Core Network
 - [x] Location Network
 - [x] Action Network
+- [x] Location Policy
 - [ ] RAM (putting all the pieces together)
 - [ ] training loop
 - [ ] config file
