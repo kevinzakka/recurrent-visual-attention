@@ -7,7 +7,7 @@ from modules import glimpse_sensor
 
 
 TEST_GLIMPSE = True
-TEST_BOUNDING = False
+TEST_BOUNDING = True
 plot_dir = './plots/'
 data_dir = './data/'
 
@@ -35,13 +35,14 @@ def main():
         imgs.append(torch.from_numpy(img))
     imgs = torch.cat(imgs)
 
-    loc = torch.Tensor(2, 2).uniform_(-1, 1)
-    # loc = torch.LongTensor([[0, 0], [0, 0]])
+    # loc = torch.Tensor(2, 2).uniform_(-1, 1)
+    loc = torch.Tensor([[-1, -1], [-1, -1]])
 
     if TEST_GLIMPSE:
 
         sensor = glimpse_sensor(g=64, k=3, s=2)
         glimpse = sensor(imgs, loc).numpy()
+        print("Glimpse: {}".format(glimpse.shape))
 
         rows, cols = glimpse.shape[0], glimpse.shape[1]
         fig, axs = plt.subplots(nrows=rows, ncols=cols, figsize=(5, 2))
@@ -52,7 +53,7 @@ def main():
                 axs[i, j].get_yaxis().set_visible(False)
         # plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
         #             bbox_inches='tight')
-        plt.show()
+        # plt.show()
 
     if TEST_BOUNDING:
 
@@ -63,7 +64,7 @@ def main():
             ax[i].imshow(imgs[i])
             size = 64
             for j in range(3):
-                rect = bounding_box(coords[i, 0], coords[i, 1], size)
+                rect = bounding_box(coords[i, 0], coords[i, 1], size, color='r')
                 ax[i].add_patch(rect)
                 size = size * 2
             ax[i].get_xaxis().set_visible(False)

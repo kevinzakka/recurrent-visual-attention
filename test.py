@@ -18,7 +18,6 @@ imgs = torch.cat(imgs)
 
 # initialize a uniform [-1, 1] location vector
 loc = torch.Tensor(batch_size, 2).uniform_(-1, 1)
-print("[-1, 1] loc: {}".format(loc))
 
 # get first glimpse
 glimpse = glimpse_network()

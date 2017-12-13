@@ -101,6 +101,7 @@ class glimpse_sensor(object):
         for i in range(x.size()[0]):
             # grab image
             p = x[i].unsqueeze(0)
+            print(p.shape)
 
             # compute slice indices
             from_x, to_x = patch_x[i], patch_x[i] + size
@@ -108,9 +109,10 @@ class glimpse_sensor(object):
 
             # prevent slice error by padding with zeros
             if (to_x > p.size()[1]) or (to_y > p.size()[1]):
-                pad_dims = [(0, 0), (0, size), (0, size), (0, 0)]
+                pad_dims = [(0, 0), (0, size//2+1), (0, size//2+1), (0, 0)]
                 p = p.numpy()
                 p = np.pad(p, pad_dims, mode='constant')
+                print("\tPadded: {}".format(p.shape))
                 p = torch.from_numpy(p)
 
             # slice the patch and append

@@ -1,5 +1,7 @@
 # Recurrent Visual Attention
 
+Work In Progress
+
 <p align="center">
  <img src="./plots/glimpses.png" alt="Drawing", width=70%>
 </p>
@@ -8,7 +10,8 @@
  <img src="./plots/bbox.png" alt="Drawing", width=70%>
 </p>
 
-## ToDo
+
+## Todo
 
 - [x] Glimpse Sensor
 - [x] Glimpse Network
