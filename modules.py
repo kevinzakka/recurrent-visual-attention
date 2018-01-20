@@ -67,7 +67,7 @@ class retina(object):
     def denormalize(self, T, coords):
         """
         Convert coordinates in the range [-1, 1] to
-        coordinates in the range [0, T] where T is
+        coordinates in the range [0, T] where `T` is
         the size of the image.
         """
         return (0.5 * ((coords + 1.0) * T)).long()
@@ -86,7 +86,7 @@ class retina(object):
     def extract_single_patch(self, x, center, size):
         """
         Extract a single patch for each image in the minibatch
-        x, centered at the coordinates `center` and of size `size`.
+        `x`, centered at the coordinates `center` and of size `size`.
 
         Args
         ----
@@ -204,60 +204,55 @@ class glimpse_network(nn.Module):
 
 class core_network(nn.Module):
     """
-    A RNN which maintains an internal state that summarizes
-    the information extracted from the history of past
-    observations. It encodes the agent's knowledge of the
-    environment through a state vector h that gets updated
-    at every time step t.
+    A RNN which maintains an internal state that integrates
+    information extracted from the history of past observations.
+    It encodes the agent's knowledge of the environment through
+    a state vector `h` that gets updated at every time step `t`.
 
-    Concretely, it takes the glimpse representation g_t as input,
-    and combines it with its internal representation h_t_prev at
-    the previous time step, to produce the new internal state h_t
-    at the current time step.
+    Concretely, it takes the glimpse representation `g_t` as input,
+    and combines it with its internal state `h_t_prev` at the previous
+    time step, to produce the new internal state `h_t` at the current
+    time step.
 
     In other words:
 
         `h_t = relu( fc(h_t_prev) + fc(g_t) )`
 
-    There is no `LSTM` or `GRU` cell in PyTorch with a ReLU
-    nonlinearity so this will fall back to the `tanh` activation.
-
     Args
     ----
+    - input_size: input size of the rnn.
+    - hidden_size: hidden size of the rnn.
     - g_t: the glimpse representation returned by the glimpse network.
-    - h_t_prev: internal representation at time step (t - 1).
+    - h_t_prev: internal representation at time step `t-1`.
 
     Returns
     -------
-    - h_t: internal representation at time step t.
+    - h_t: internal representation at time step `t`.
     """
 
-    def __init__(self, input_size=256, hidden_size=256):
+    def __init__(self, input_size, hidden_size):
         super(core_network, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.rnn = nn.LSTM(input_size, hidden_size, 1)
+
+        self.i2h = nn.Linear(input_size, hidden_size)
+        self.h2h = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, g_t, h_t_prev):
-        g_t = torch.unsqueeze(g_t, 0)
-        _, h_t = self.rnn(g_t, h_t_prev)
+        h1 = self.i2h(g_t)
+        h2 = self.h2h(h_t_prev)
+        h_t = F.relu(h1 + h2)
         return h_t
-
-    def init_hidden(self, batch_size):
-        return (
-            Variable(torch.zeros(1, batch_size, self.hidden_size)),
-            Variable(torch.zeros(1, batch_size, self.hidden_size))
-        )
 
 
 class action_network(nn.Module):
     """
-    Uses the internal state h_t of the core network to
+    Uses the internal state `h_t` of the core network to
     produce the final output classification.
 
-    Concretely, feeds the hidden state h_t to a fc
-    layer and applies a softmax to create a vector
-    of output probabilities over the possible classes.
+    Concretely, feeds the hidden state `h_t` through a fc
+    layer followed by a softmax to create a vector of
+    output probabilities over the possible classes.
 
     Args
     ----
@@ -265,22 +260,31 @@ class action_network(nn.Module):
     - num_classes: output size of the fc layer.
     - h_t: the hidden state vector of the core network at
       time step t.
+
+    Returns
+    -------
+    - y: the output class of the input image x.
     """
 
-    def __init__(self, input_size, num_classes):
+    def __init__(self, input_size, output_size):
         super(action_network, self).__init__()
-        self.fc = nn.Linear(input_size, num_classes)
+        self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, x):
-        return F.softmax(self.fc(x))
+        y = F.log_softmax(self.fc(x))
+        return y
 
 
 class location_network(nn.Module):
     """
-    Uses the internal state h_t of the core network to
+    Uses the internal state `h_t` of the core network to
     produce a 2D vector of means used to parametrize the
-    policy for the locations l. The policy itself is a
+    policy for the locations `l`. The policy itself is a
     two-component Gaussian with a fixed variance.
+
+    Concretely, feeds the hidden state `h_t` through a fc
+    layer followed by a tanh to clamp the output beween
+    [-1, 1].
 
     Args
     ----
@@ -301,31 +305,3 @@ class location_network(nn.Module):
     def forward(self, h_t):
         mean = F.tanh(self.fc(h_t))
         return mean
-
-
-class Policy(nn.Module):
-    """
-    The policy for the locations l is defined as a two-component
-    Gaussian with a fixed variance. The Gaussian is parametrized
-    by the output of the location network.
-
-    TODO: use `.detach()` to stop the gradient flow.
-
-    Args
-    ----
-    - std: fixed std deviation of the location policy.
-    - mean: mean of the location policy returned by the location
-            network.
-
-    Returns
-    -------
-    - l_t_next: the location vector for the next time step.
-    """
-
-    def __init__(self, std):
-        super(Policy, self).__init__()
-        self.std = std
-
-    def forward(self, mean):
-        l_t_next = F.tanh(Normal(mean, self.std).sample())
-        return l_t_next

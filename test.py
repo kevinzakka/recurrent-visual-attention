@@ -1,7 +1,7 @@
 import torch
 
 from utils import img2array
-from modules import glimpse_network
+from modules import glimpse_network, core_network
 from torch.autograd import Variable
 
 # params
@@ -24,8 +24,14 @@ def main():
     loc = torch.Tensor([[-1., 1.], [-1., 1.]])
     imgs, loc = Variable(imgs), Variable(loc)
     sensor = glimpse_network(h_g=128, h_l=128, g=64, k=3, s=2)
-    glimpse_vec = sensor(imgs, loc)
-    print(glimpse_vec.shape)
+    g_t = sensor(imgs, loc)
+
+    rnn = core_network(input_size=256, hidden_size=256)
+
+    h_t = Variable(torch.zeros(g_t.shape[0], 256))
+    h_t = rnn(g_t, h_t)
+
+    print(h_t.shape)
 
 
 if __name__ == '__main__':
