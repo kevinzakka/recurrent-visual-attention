@@ -2,6 +2,7 @@ import torch
 
 from utils import img2array
 from modules import glimpse_network, core_network
+from modules import action_network, location_network
 from torch.autograd import Variable
 
 # params
@@ -27,12 +28,14 @@ def main():
     g_t = sensor(imgs, loc)
 
     rnn = core_network(input_size=256, hidden_size=256)
-
     h_t = Variable(torch.zeros(g_t.shape[0], 256))
     h_t = rnn(g_t, h_t)
 
-    print(h_t.shape)
+    classifier = action_network(256, 10)
+    a_t = classifier(h_t)
 
+    loc_net = location_network(256, 2)
+    mean = loc_net(h_t)
 
 if __name__ == '__main__':
     main()

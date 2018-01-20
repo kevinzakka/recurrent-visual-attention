@@ -157,8 +157,8 @@ class glimpse_network(nn.Module):
 
     Args
     ----
-    - h_g: hidden layer size of the fc layer for phi.
-    - h_l: hidden layer size of the fc layer for l.
+    - h_g: hidden layer size of the fc layer for `phi`.
+    - h_l: hidden layer size of the fc layer for `l`.
     - g: size of the square patches in the glimpses extracted
       by the retina.
     - k: number of patches to extract per glimpse.
@@ -223,11 +223,11 @@ class core_network(nn.Module):
     - input_size: input size of the rnn.
     - hidden_size: hidden size of the rnn.
     - g_t: the glimpse representation returned by the glimpse network.
-    - h_t_prev: internal representation at time step `t-1`.
+    - h_t_prev: hidden state vector at time step `t-1`.
 
     Returns
     -------
-    - h_t: internal representation at time step `t`.
+    - h_t: hidden state vector at time step `t`.
     """
 
     def __init__(self, input_size, hidden_size):
@@ -254,33 +254,37 @@ class action_network(nn.Module):
     layer followed by a softmax to create a vector of
     output probabilities over the possible classes.
 
+    Hence, the environment action `a_t` is drawn from a
+    distribution conditioned on an affine transformation
+    of the hidden state vector `h_t`, or in other words,
+    the action network is simply a linear softmax classifier.
+
     Args
     ----
     - input_size: input size of the fc layer.
-    - num_classes: output size of the fc layer.
+    - output_size: output size of the fc layer.
     - h_t: the hidden state vector of the core network at
-      time step t.
+      time step `t`.
 
     Returns
     -------
-    - y: the output class of the input image x.
+    - a_t: output probability vector over the classes.
     """
 
     def __init__(self, input_size, output_size):
         super(action_network, self).__init__()
         self.fc = nn.Linear(input_size, output_size)
 
-    def forward(self, x):
-        y = F.log_softmax(self.fc(x))
-        return y
+    def forward(self, h_t):
+        a_t = F.softmax(self.fc(h_t), dim=1)
+        return a_t
 
 
 class location_network(nn.Module):
     """
     Uses the internal state `h_t` of the core network to
     produce a 2D vector of means used to parametrize the
-    policy for the locations `l`. The policy itself is a
-    two-component Gaussian with a fixed variance.
+    policy for the locations `l`.
 
     Concretely, feeds the hidden state `h_t` through a fc
     layer followed by a tanh to clamp the output beween
@@ -291,7 +295,7 @@ class location_network(nn.Module):
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
     - h_t: the hidden state vector of the core network at
-      time step t.
+      time step `t`.
 
     Returns
     -------
