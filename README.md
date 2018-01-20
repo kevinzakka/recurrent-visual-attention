@@ -22,3 +22,4 @@ Work In Progress
 - [ ] RAM (putting all the pieces together)
 - [ ] training loop
 - [ ] config file
+- make the patch extraction code vectorized (don't know if possible)

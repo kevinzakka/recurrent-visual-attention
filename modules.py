@@ -9,33 +9,33 @@ from torch.autograd import Variable
 from torch.distributions import Normal
 
 
-class glimpse_sensor(object):
+class retina(object):
     """
-    Bandwidth-limited sensor that extracts
-    a retina-like representation phi around
-    location l from image x.
+    A retina-like representation that extracts
+    foveated glimpses `phi` around location `l`
+    from image `x`.
 
-    Extracts k square patches of size g, centered
-    at location l. Each subsequent set of patches
-    has `s*g` size of the previous k patches.
+    Extracts `k` square patches of size `g`, centered
+    at location `l`. Each subsequent set of patches
+    has `s*g` size of the previous `k` patches.
 
-    The k patches are finally resized to (g, g) and
+    The `k` patches are finally resized to (g, g) and
     concatenated.
 
     Args
     ----
     - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
-    - l: a minibatch of (x, y) column vector coordinates in the
-         range [-1, 1] with the center corresponding to (0, 0)
-         and the top left corner corresponding to (-1, -1).
-         l is a 2D Tensor of shape (2, B).
+    - l: a minibatch of (x, y) coordinates in the range [-1, 1]
+      with the center corresponding to (0, 0) and the top left
+      corner corresponding to (-1, -1). l is a 2D Tensor of
+      shape (B, 2).
     - g: height and width of the first extracted patch.
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
 
     Returns
     -------
-    - phi: foveated glimpse of an image at a given location.
+    - phi: foveated glimpse of the image.
     """
 
     def __init__(self, g, k, s):
@@ -60,7 +60,7 @@ class glimpse_sensor(object):
                else np.expand_dims(p, 1) for p in phi]
 
         # concatenate into single vector
-        phi = torch.from_numpy(np.concatenate(phi, 1))
+        phi = Variable(torch.from_numpy(np.concatenate(phi, 1)))
 
         return phi
 
@@ -72,16 +72,14 @@ class glimpse_sensor(object):
         """
         return (0.5 * ((coords + 1.0) * T)).long()
 
-    def normalize(self, T, coords):
-        """
-        Convert coordinates in the range [0, T] to
-        coordinates in the range [-1, 1] where T is
-        the size of the image.
-        """
-        return (((2*coords.float()) / T) - 1)
-
     def out_of_bounds(self, from_x, to_x, from_y, to_y, size):
-        if ((from_x < 0) or (from_y < 0) or (to_x > size) or (to_y > size)):
+        """
+        Check whether the extracted patch will exceed
+        the boundaries of the image.
+        """
+        if (
+            (from_x < 0) or (from_y < 0) or (to_x > size) or (to_y.data > size)
+        ):
             return True
         return False
 
@@ -93,7 +91,7 @@ class glimpse_sensor(object):
         Args
         ----
         - x: a 4D Tensor of shape (B, H, W, C).
-        - center: a 2D Tensor of shape (2, B).
+        - center: a 2D Tensor of shape (B, 2).
         - size: a scalar defining the size of the extracted patch.
 
         Returns
@@ -102,17 +100,18 @@ class glimpse_sensor(object):
         """
         # compute unnormalized coords of patch center
         coords = self.denormalize(x.shape[1], center)
+        coords = coords.data.numpy()
 
         # find upper left corner of patch given center
-        patch_x = coords[0, :] - (size // 2)
-        patch_y = coords[1, :] - (size // 2)
+        patch_x = coords[:, 0] - (size // 2)
+        patch_y = coords[:, 1] - (size // 2)
 
         # extract patch
         patch = []
         for i in range(len(x)):
 
             # grab image
-            p = x[i].unsqueeze(0)
+            p = x[i].unsqueeze(0).data
 
             # compute slice indices
             from_x, to_x = patch_x[i], patch_x[i] + size
@@ -128,10 +127,10 @@ class glimpse_sensor(object):
                 p = torch.from_numpy(p)
 
                 # since size increased, correct coordinates
-                from_x = (size//2+1) + from_x
-                from_y = (size//2+1) + from_y
-                to_x = to_x + (size//2+1)
-                to_y = to_y + (size//2+1)
+                from_x += (size//2+1)
+                from_y += (size//2+1)
+                to_x += (size//2+1)
+                to_y += (size//2+1)
 
             # slice the patch and append
             patch.append(p[:, from_y:to_y, from_x:to_x, :])
@@ -144,11 +143,11 @@ class glimpse_sensor(object):
 class glimpse_network(nn.Module):
     """
     A trainable, bandwidth-limited sensor that mimics
-    attention by producing a glimpse representation g_t.
+    attention by producing a glimpse representation `g_t`.
 
-    Feeds the output of the glimpse_sensor to a fc layer h_,
-    the glimpse location l to a fc layer, and applies a
-    ReLU nonlinearity to their concatenation.
+    Feeds the output of the retina `phi` to a fc layer,
+    the glimpse location vector `l` to a fc layer, and
+    applies a ReLU nonlinearity to their concatenation.
 
     In other words:
 
@@ -160,30 +159,45 @@ class glimpse_network(nn.Module):
     ----
     - h_g: hidden layer size of the fc layer for phi.
     - h_l: hidden layer size of the fc layer for l.
+    - g: size of the square patches in the glimpses extracted
+      by the retina.
+    - k: number of patches to extract per glimpse.
+    - s: scaling factor that controls the size of successive patches.
     - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
-    - l: the location vector containing the glimpse coordinates [x, y].
+    - l: the location vector containing the glimpse coordinates [x, y]. 2D
+      tensor of shape (B, 2).
 
     Returns
     -------
     - g_t: glimpse representation vector.
     """
 
-    def __init__(self, h_g=128, h_l=128, g=256, k=3, s=2):
+    def __init__(self, h_g, h_l, g, k, s):
         super(glimpse_network, self).__init__()
-        self.sensor = glimpse_sensor(g, k, s)
-        self.fc1 = nn.Linear(g, h_g)
-        self.fc2 = nn.Linear(2, h_l)
+        self.retina = retina(g, k, s)
+
+        # glimpse layer
+        D_in = k*g*g*3
+        self.fc1 = nn.Linear(D_in, h_g)
+
+        # location layer
+        D_in = 2
+        self.fc2 = nn.Linear(D_in, h_l)
 
     def forward(self, x, l):
-        # compute phi
-        phi = self.sensor(x, l)
+        # generate glimpse phi from image x
+        phi = self.retina(x, l)
+
+        # flatten both for fully-connected
+        phi = phi.view(phi.size(0), -1)
+        l = l.view(l.size(0), -1)
 
         # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l))
 
         # concatenate and apply nonlinearity
-        g_t = F.relu(torch.cat([phi_out, l_out]))
+        g_t = F.relu(torch.cat([phi_out, l_out], dim=1))
 
         return g_t
 
@@ -197,8 +211,9 @@ class core_network(nn.Module):
     at every time step t.
 
     Concretely, it takes the glimpse representation g_t as input,
-    and combines it with its interal representation h_t_prev at
-    the previous time step, to produce the new internal state h_t.
+    and combines it with its internal representation h_t_prev at
+    the previous time step, to produce the new internal state h_t
+    at the current time step.
 
     In other words:
 
@@ -210,7 +225,7 @@ class core_network(nn.Module):
     Args
     ----
     - g_t: the glimpse representation returned by the glimpse network.
-    - h_t_prev: internal representatino at time step (t - 1).
+    - h_t_prev: internal representation at time step (t - 1).
 
     Returns
     -------

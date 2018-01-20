@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 from utils import img2array
-from modules import glimpse_sensor
+from modules import retina
+from torch.autograd import Variable
 
-
+# params
 TEST_GLIMPSE = True
 TEST_BOUNDING = True
 plot_dir = './plots/'
@@ -40,14 +41,14 @@ def main():
     for i in range(len(paths)):
         img = img2array(paths[i], desired_size=[512, 512], expand=True)
         imgs.append(torch.from_numpy(img))
-    imgs = torch.cat(imgs)
+    imgs = Variable(torch.cat(imgs))
 
-    loc = torch.Tensor([[-1., -1.], [1., 1.]])
+    loc = Variable(torch.Tensor([[-1., -1.], [-1., -1.]]))
 
     if TEST_GLIMPSE:
 
-        sensor = glimpse_sensor(g=64, k=3, s=2)
-        glimpse = sensor(imgs, loc).numpy()
+        ret = retina(g=64, k=3, s=2)
+        glimpse = ret(imgs, loc).data.numpy()
         print("Glimpse: {}".format(glimpse.shape))
 
         rows, cols = glimpse.shape[0], glimpse.shape[1]
@@ -64,14 +65,14 @@ def main():
     if TEST_BOUNDING:
 
         fig, ax = plt.subplots(nrows=1, ncols=2)
-        coords = denormalize(imgs.shape[1], loc)
-        imgs = imgs.numpy()
+        coords = denormalize(imgs.shape[1], loc.data)
+        imgs = imgs.data.numpy()
         for i in range(len(imgs)):
             ax[i].imshow(imgs[i])
             size = 64
             for j in range(3):
                 rect = bounding_box(
-                    coords[0, i], coords[1, i], size, color='r'
+                    coords[i, 0], coords[i, 1], size, color='r'
                 )
                 ax[i].add_patch(rect)
                 size = size * 2
