@@ -16,8 +16,8 @@ class glimpse_sensor(object):
     location l from image x.
 
     Extracts k square patches of size g, centered
-    at location l. Each successive patch has `s*g`
-    size of the previous patch.
+    at location l. Each subsequent set of patches
+    has `s*g` size of the previous k patches.
 
     The k patches are finally resized to (g, g) and
     concatenated.
@@ -25,10 +25,10 @@ class glimpse_sensor(object):
     Args
     ----
     - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
-    - l: a minibatch of (x, y) coordinates in the range [-1, 1]
-         with the center corresponding to (0, 0) and the top left
-         corner corresponding to (-1, -1). l is a 2D Tensor of shape
-         (B, 2).
+    - l: a minibatch of (x, y) column vector coordinates in the
+         range [-1, 1] with the center corresponding to (0, 0)
+         and the top left corner corresponding to (-1, -1).
+         l is a 2D Tensor of shape (2, B).
     - g: height and width of the first extracted patch.
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
@@ -65,9 +65,25 @@ class glimpse_sensor(object):
         return phi
 
     def denormalize(self, T, coords):
-        x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
-        y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
-        return torch.stack([x_original, y_original]).long()
+        """
+        Convert coordinates in the range [-1, 1] to
+        coordinates in the range [0, T] where T is
+        the size of the image.
+        """
+        return (0.5 * ((coords + 1.0) * T)).long()
+
+    def normalize(self, T, coords):
+        """
+        Convert coordinates in the range [0, T] to
+        coordinates in the range [-1, 1] where T is
+        the size of the image.
+        """
+        return (((2*coords.float()) / T) - 1)
+
+    def out_of_bounds(self, from_x, to_x, from_y, to_y, size):
+        if ((from_x < 0) or (from_y < 0) or (to_x > size) or (to_y > size)):
+            return True
+        return False
 
     def extract_single_patch(self, x, center, size):
         """
@@ -77,46 +93,48 @@ class glimpse_sensor(object):
         Args
         ----
         - x: a 4D Tensor of shape (B, H, W, C).
-        - center: a 2D Tensor of shape (B, 2).
+        - center: a 2D Tensor of shape (2, B).
         - size: a scalar defining the size of the extracted patch.
 
         Returns
         -------
         - patch: a 4D Tensor of shape (B, size, size, C)
         """
-
         # compute unnormalized coords of patch center
-        coords = self.denormalize(x.size()[1], center)
+        coords = self.denormalize(x.shape[1], center)
 
-        # compute equivalent coords in original img
-        patch_x = coords[:, 0] - (size // 2)
-        patch_y = coords[:, 1] - (size // 2)
-
-        # clip to image bounds
-        patch_x = torch.clamp(patch_x, 0, x.size()[1])
-        patch_y = torch.clamp(patch_y, 0, x.size()[1])
+        # find upper left corner of patch given center
+        patch_x = coords[0, :] - (size // 2)
+        patch_y = coords[1, :] - (size // 2)
 
         # extract patch
         patch = []
-        for i in range(x.size()[0]):
+        for i in range(len(x)):
+
             # grab image
             p = x[i].unsqueeze(0)
-            print(p.shape)
 
             # compute slice indices
             from_x, to_x = patch_x[i], patch_x[i] + size
             from_y, to_y = patch_y[i], patch_y[i] + size
 
-            # prevent slice error by padding with zeros
-            if (to_x > p.size()[1]) or (to_y > p.size()[1]):
-                pad_dims = [(0, 0), (0, size//2+1), (0, size//2+1), (0, 0)]
+            if self.out_of_bounds(from_x, to_x, from_y, to_y, p.shape[1]):
+                pad_dims = [
+                    (0, 0), (size//2+1, size//2+1),
+                    (size//2+1, size//2+1), (0, 0),
+                ]
                 p = p.numpy()
                 p = np.pad(p, pad_dims, mode='constant')
-                print("\tPadded: {}".format(p.shape))
                 p = torch.from_numpy(p)
 
+                # since size increased, correct coordinates
+                from_x = (size//2+1) + from_x
+                from_y = (size//2+1) + from_y
+                to_x = to_x + (size//2+1)
+                to_y = to_y + (size//2+1)
+
             # slice the patch and append
-            patch.append(p[:, from_x:to_x, from_y:to_y, :])
+            patch.append(p[:, from_y:to_y, from_x:to_x, :])
 
         patch = torch.cat(patch)
 

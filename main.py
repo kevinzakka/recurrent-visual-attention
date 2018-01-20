@@ -13,21 +13,28 @@ data_dir = './data/'
 
 
 def denormalize(T, coords):
-    x_original = torch.mul(coords[:, 0], int(T/2)) + int((T/2))
-    y_original = torch.mul(coords[:, 1], int(T/2)) + int((T/2))
-    return torch.stack([x_original, y_original])
+    """
+    Convert coordinate in the range [-1, 1] to
+    coordinates in the range [0, T] where T
+    is the size of the image.
+    """
+    x = 0.5 * ((coords[:, 0] + 1.0) * T)
+    y = 0.5 * ((coords[:, 1] + 1.0) * T)
+    return torch.stack([x, y], dim=1).long()
 
 
 def bounding_box(x, y, size, color='w'):
     x = int(x - (size / 2))
     y = int(y - (size / 2))
-    rect = patches.Rectangle((x, y), size, size, linewidth=1,
-                             edgecolor=color, fill=False)
+    rect = patches.Rectangle(
+        (x, y), size, size, linewidth=1, edgecolor=color, fill=False
+    )
     return rect
 
 
 def main():
 
+    # load images
     imgs = []
     paths = [data_dir + './lenna.jpg', data_dir + './cat.jpg']
     for i in range(len(paths)):
@@ -35,8 +42,7 @@ def main():
         imgs.append(torch.from_numpy(img))
     imgs = torch.cat(imgs)
 
-    # loc = torch.Tensor(2, 2).uniform_(-1, 1)
-    loc = torch.Tensor([[-1, -1], [-1, -1]])
+    loc = torch.Tensor([[-1., -1.], [1., 1.]])
 
     if TEST_GLIMPSE:
 
@@ -64,7 +70,9 @@ def main():
             ax[i].imshow(imgs[i])
             size = 64
             for j in range(3):
-                rect = bounding_box(coords[i, 0], coords[i, 1], size, color='r')
+                rect = bounding_box(
+                    coords[0, i], coords[1, i], size, color='r'
+                )
                 ax[i].add_patch(rect)
                 size = size * 2
             ax[i].get_xaxis().set_visible(False)
