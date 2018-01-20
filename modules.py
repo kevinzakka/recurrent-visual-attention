@@ -264,7 +264,7 @@ class action_network(nn.Module):
     - input_size: input size of the fc layer.
     - num_classes: output size of the fc layer.
     - h_t: the hidden state vector of the core network at
-           time step t.
+      time step t.
     """
 
     def __init__(self, input_size, num_classes):
@@ -287,14 +287,14 @@ class location_network(nn.Module):
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
     - h_t: the hidden state vector of the core network at
-           time step t.
+      time step t.
 
     Returns
     -------
     - mean: a 2D vector of size (B, 2).
     """
 
-    def __init__(self, input_size, output_size=2):
+    def __init__(self, input_size, output_size):
         super(location_network, self).__init__()
         self.fc = nn.Linear(input_size, output_size)
 
