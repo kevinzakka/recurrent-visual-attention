@@ -1,5 +1,7 @@
 data/processed/
 data/raw/
+logs/
+ckpt/
 .DS_Store
 
 # Byte-compiled / optimized / DLL files
