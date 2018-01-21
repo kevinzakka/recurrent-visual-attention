@@ -1,9 +1,9 @@
 import torch
 
 from utils import img2array
+from torch.autograd import Variable
 from modules import glimpse_network, core_network
 from modules import action_network, location_network
-from torch.autograd import Variable
 
 # params
 plot_dir = './plots/'
@@ -24,7 +24,7 @@ def main():
 
     loc = torch.Tensor([[-1., 1.], [-1., 1.]])
     imgs, loc = Variable(imgs), Variable(loc)
-    sensor = glimpse_network(h_g=128, h_l=128, g=64, k=3, s=2)
+    sensor = glimpse_network(h_g=128, h_l=128, g=64, k=3, s=2, c=3)
     g_t = sensor(imgs, loc)
 
     rnn = core_network(input_size=256, hidden_size=256)
@@ -34,8 +34,13 @@ def main():
     classifier = action_network(256, 10)
     a_t = classifier(h_t)
 
-    loc_net = location_network(256, 2)
-    mean = loc_net(h_t)
+    loc_net = location_network(256, 2, 0.11)
+    l_t = loc_net(h_t)
+
+    print("g_t: {}".format(g_t.shape))
+    print("h_t: {}".format(h_t.shape))
+    print("l_t: {}".format(l_t.shape))
+    print("a_t: {}".format(a_t.shape))
 
 if __name__ == '__main__':
     main()

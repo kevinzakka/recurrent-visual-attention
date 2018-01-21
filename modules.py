@@ -163,6 +163,7 @@ class glimpse_network(nn.Module):
       by the retina.
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
+    - c: number of channels in each image.
     - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
     - l: the location vector containing the glimpse coordinates [x, y]. 2D
       tensor of shape (B, 2).
@@ -172,12 +173,12 @@ class glimpse_network(nn.Module):
     - g_t: glimpse representation vector.
     """
 
-    def __init__(self, h_g, h_l, g, k, s):
+    def __init__(self, h_g, h_l, g, k, s, c):
         super(glimpse_network, self).__init__()
         self.retina = retina(g, k, s)
 
         # glimpse layer
-        D_in = k*g*g*3
+        D_in = k*g*g*c
         self.fc1 = nn.Linear(D_in, h_g)
 
         # location layer
@@ -192,7 +193,7 @@ class glimpse_network(nn.Module):
         phi = phi.view(phi.size(0), -1)
         l = l.view(l.size(0), -1)
 
-        # feed phi and l to respective fc layers
+        # feed phi and l tgo respective fc layers
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l))
 
@@ -283,29 +284,44 @@ class action_network(nn.Module):
 class location_network(nn.Module):
     """
     Uses the internal state `h_t` of the core network to
-    produce a 2D vector of means used to parametrize the
-    policy for the locations `l`.
+    produce the location coordinates `l_t` for the next
+    time step.
 
     Concretely, feeds the hidden state `h_t` through a fc
     layer followed by a tanh to clamp the output beween
-    [-1, 1].
+    [-1, 1]. This produces a 2D vector of means used to
+    parametrize a two-component Gaussian with a fixed
+    variance from which the location coordinates `l_t`
+    for the next time step are sampled.
+
+    Hence, the location `l_t` is chosen stochastically
+    from a distribution conditioned on an affine
+    transformation of the hidden state vector `h_t`.
+
+    Todo: add arg for training vs testing.
 
     Args
     ----
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
+    - std: standard deviation of the normal distribution.
     - h_t: the hidden state vector of the core network at
       time step `t`.
 
     Returns
     -------
-    - mean: a 2D vector of size (B, 2).
+    - mean: a 2D vector of shape (B, 2).
+    - l_t: a 2D vector of shape (B, 2).
     """
 
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, output_size, std):
         super(location_network, self).__init__()
+        self.std = std
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
         mean = F.tanh(self.fc(h_t))
-        return mean
+        mean = mean.detach()
+        l_t = F.tanh(Normal(mean, self.std).sample())
+        l_t = l_t.detach()
+        return mean, l_t

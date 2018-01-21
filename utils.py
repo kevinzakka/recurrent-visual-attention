@@ -3,6 +3,15 @@ import numpy as np
 from PIL import Image
 
 
+def normalize(T, coords):
+    """
+    Convert coordinates in the range [0, T] to
+    coordinates in the range [-1, 1] where T is
+    the size of the image.
+    """
+    return (((2*coords.float()) / T) - 1)
+
+
 def str2bool(v):
     return v.lower() in ('true', '1')
 
