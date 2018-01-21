@@ -1,3 +1,6 @@
+import sys
+sys.path.append("..")
+
 import torch
 
 from utils import img2array
@@ -5,8 +8,8 @@ from torch.autograd import Variable
 from model import RecurrentAttention
 
 # params
-plot_dir = './plots/'
-data_dir = './data/'
+plot_dir = '../plots/'
+data_dir = '../data/'
 
 
 def main():

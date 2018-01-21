@@ -1,3 +1,5 @@
+import os
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -72,7 +74,7 @@ def plot_images(images, gd_truth):
         '6', '7', '8', '9'
     ]
 
-    assert len(images) == len(cls_true) == 9
+    assert len(images) == len(gd_truth) == 9
 
     # Create figure with sub-plots.
     fig, axes = plt.subplots(3, 3)
@@ -103,7 +105,11 @@ def prepare_dirs(config):
 
 
 def save_config(config):
-    filename = get_model_name(config) + '_params.json'
+    model_name = 'ram_{}_{}x{}_{}'.format(
+        config.num_glimpses, config.patch_size,
+        config.patch_size, config.patch_scale
+    )
+    filename = model_name + '_params.json'
     param_path = os.path.join(config.ckpt_dir, filename)
 
     print("[*] Model Checkpoint Dir: {}".format(config.ckpt_dir))
@@ -111,11 +117,3 @@ def save_config(config):
 
     with open(param_path, 'w') as fp:
         json.dump(config.__dict__, fp, indent=4, sort_keys=True)
-
-
-def get_model_name(config):
-        if config.bottleneck:
-            return 'DenseNet-BC-{}-{}'.format(
-                config.num_layers_total, config.dataset)
-        return 'DenseNet-{}-{}'.format(
-            config.num_layers_total, config.dataset)

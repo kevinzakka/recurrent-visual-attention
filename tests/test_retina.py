@@ -1,3 +1,6 @@
+import sys
+sys.path.append("..")
+
 import torch
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -9,8 +12,8 @@ from torch.autograd import Variable
 # params
 TEST_GLIMPSE = True
 TEST_BOUNDING = True
-plot_dir = './plots/'
-data_dir = './data/'
+plot_dir = '../plots/'
+data_dir = '../data/'
 
 
 def denormalize(T, coords):
@@ -48,7 +51,7 @@ def main():
     if TEST_GLIMPSE:
 
         ret = retina(g=64, k=3, s=2)
-        glimpse = ret(imgs, loc).data.numpy()
+        glimpse = ret.foveate(imgs, loc).data.numpy()
         print("Glimpse: {}".format(glimpse.shape))
 
         rows, cols = glimpse.shape[0], glimpse.shape[1]
