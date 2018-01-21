@@ -11,31 +11,28 @@ from torch.distributions import Normal
 
 class retina(object):
     """
-    A retina-like representation that extracts
-    foveated glimpses `phi` around location `l`
-    from image `x`.
-
-    Extracts `k` square patches of size `g`, centered
-    at location `l`. Each subsequent set of patches
-    has `s*g` size of the previous `k` patches.
-
-    The `k` patches are finally resized to (g, g) and
-    concatenated.
+    A retina that extracts a foveated glimpse `phi`
+    around location `l` from an image `x`. It encodes
+    the region around `l` at a high-resolution but uses
+    a progressively lower resolution for pixels further
+    from `l`, resulting in a compressed representation
+    of the original image `x`.
 
     Args
     ----
     - x: a 4D Tensor of shape (B, H, W, C). The minibatch
       of images.
-    - l: a 2D Tensor of shape (B, 2). l contains coordinates
-      in the range [-1, 1] with the center corresponding to (0, 0)
-      and the top left corner corresponding to (-1, -1).
-    - g: height and width of the first extracted patch.
-    - k: number of patches to extract per glimpse.
-    - s: scaling factor that controls the size of successive patches.
+    - l: a 2D Tensor of shape (B, 2). Contains normalized
+      coordinates in the range [-1, 1].
+    - g: size of the first square patch.
+    - k: number of patches to extract in the glimpse.
+    - s: scaling factor that controls the size of
+      successive patches.
 
     Returns
     -------
-    - phi: foveated glimpse of the image.
+    - phi: a 5D tensor of shape (B, k, g, g, C). The
+      foveated glimpse of the image.
     """
 
     def __init__(self, g, k, s):
@@ -43,26 +40,94 @@ class retina(object):
         self.k = k
         self.s = s
 
-    def __call__(self, x, l):
+    def foveate(self, x, l):
+        """
+        Extract `k` square patches of size `g`, centered
+        at location `l`. The initial patch is a square of
+        size `g`, and each subsequent patch is a square
+        whose side is `s` times the size of the previous
+        patch.
+
+        The `k` patches are finally resized to (g, g)
+        and concatenated into a 5D tensor of shape (B, k, g, g, C).
+        """
         phi = []
         size = self.g
+
+        # extract k patches of decreasing resolution
         for i in range(self.k):
-            # extract the patch
-            phi.append(self.extract_single_patch(x, l, size))
-            # scale the patch size
+            phi.append(self.extract_patch(x, l, size))
             size = int(self.s * size)
 
-        # convert to numpy array to resize
-        phi = [p.numpy() for p in phi]
-
         # resize the patches to squares of size g
-        phi = [resize_array(p, self.g) if p.shape[1] != self.g
-               else np.expand_dims(p, 1) for p in phi]
+        phi = [p.numpy() for p in phi]
+        phi = [
+            resize_array(p, self.g) if p.shape[1] != self.g
+            else np.expand_dims(p, 1) for p in phi
+        ]
 
-        # concatenate into single vector
+        # concatenate into a single tensor
         phi = Variable(torch.from_numpy(np.concatenate(phi, 1)))
 
         return phi
+
+    def extract_patch(self, x, l, size):
+        """
+        Extract a single patch for each image in the
+        minibatch `x`.
+
+        Args
+        ----
+        - x: a 4D Tensor of shape (B, H, W, C). The minibatch
+          of images.
+        - l: a 2D Tensor of shape (B, 2).
+        - size: a scalar defining the size of the extracted patch.
+
+        Returns
+        -------
+        - patch: a 4D Tensor of shape (B, size, size, C)
+        """
+        # denormalize coords of patch center
+        coords = self.denormalize(x.shape[1], l)
+        coords = coords.data.numpy()
+
+        # compute top left corner of patch
+        patch_x = coords[:, 0] - (size // 2)
+        patch_y = coords[:, 1] - (size // 2)
+
+        # loop through minibatch
+        patch = []
+        for i in range(len(x)):
+            # grab img
+            p = x[i].unsqueeze(0).data
+            T = p.shape[1]
+
+            # compute slice indices
+            from_x, to_x = patch_x[i], patch_x[i] + size
+            from_y, to_y = patch_y[i], patch_y[i] + size
+
+            # pad the img if patch exceeds its bounds
+            if self.exceeds(from_x, to_x, from_y, to_y, T):
+                pad_dims = [
+                    (0, 0), (size//2+1, size//2+1),
+                    (size//2+1, size//2+1), (0, 0),
+                ]
+                p = p.numpy()
+                p = np.pad(p, pad_dims, mode='constant')
+                p = torch.from_numpy(p)
+
+                # add correction factor
+                from_x += (size//2+1)
+                from_y += (size//2+1)
+                to_x += (size//2+1)
+                to_y += (size//2+1)
+
+            # extract the patch
+            patch.append(p[:, from_y:to_y, from_x:to_x, :])
+
+        patch = torch.cat(patch)
+
+        return patch
 
     def denormalize(self, T, coords):
         """
@@ -72,83 +137,30 @@ class retina(object):
         """
         return (0.5 * ((coords + 1.0) * T)).long()
 
-    def out_of_bounds(self, from_x, to_x, from_y, to_y, size):
+    def exceeds(self, from_x, to_x, from_y, to_y, T):
         """
         Check whether the extracted patch will exceed
-        the boundaries of the image.
+        the boundaries of the image of size `T`.
         """
         if (
-            (from_x < 0) or (from_y < 0) or (to_x > size) or (to_y.data > size)
+            (from_x < 0) or (from_y < 0) or (to_x > T) or (to_y > T)
         ):
             return True
         return False
 
-    def extract_single_patch(self, x, center, size):
-        """
-        Extract a single patch for each image in the minibatch
-        `x`, centered at the coordinates `center` and of size `size`.
-
-        Args
-        ----
-        - x: a 4D Tensor of shape (B, H, W, C). The minibatch
-          of images.
-        - center: a 2D Tensor of shape (B, 2).
-        - size: a scalar defining the size of the extracted patch.
-
-        Returns
-        -------
-        - patch: a 4D Tensor of shape (B, size, size, C)
-        """
-        # compute unnormalized coords of patch center
-        coords = self.denormalize(x.shape[1], center)
-        coords = coords.data.numpy()
-
-        # find upper left corner of patch given center
-        patch_x = coords[:, 0] - (size // 2)
-        patch_y = coords[:, 1] - (size // 2)
-
-        # extract patch
-        patch = []
-        for i in range(len(x)):
-
-            # grab image
-            p = x[i].unsqueeze(0).data
-
-            # compute slice indices
-            from_x, to_x = patch_x[i], patch_x[i] + size
-            from_y, to_y = patch_y[i], patch_y[i] + size
-
-            if self.out_of_bounds(from_x, to_x, from_y, to_y, p.shape[1]):
-                pad_dims = [
-                    (0, 0), (size//2+1, size//2+1),
-                    (size//2+1, size//2+1), (0, 0),
-                ]
-                p = p.numpy()
-                p = np.pad(p, pad_dims, mode='constant')
-                p = torch.from_numpy(p)
-
-                # since size increased, correct coordinates
-                from_x += (size//2+1)
-                from_y += (size//2+1)
-                to_x += (size//2+1)
-                to_y += (size//2+1)
-
-            # slice the patch and append
-            patch.append(p[:, from_y:to_y, from_x:to_x, :])
-
-        patch = torch.cat(patch)
-
-        return patch
-
 
 class glimpse_network(nn.Module):
     """
-    A trainable, bandwidth-limited sensor that mimics
-    attention by producing a glimpse representation `g_t`.
+    A network that combines the "what" and the "where"
+    into a glimpse feature vector g_t.
 
-    Feeds the output of the retina `phi` to a fc layer,
-    the glimpse location vector `l` to a fc layer, and
-    applies a ReLU nonlinearity to their concatenation.
+    - "what": glimpse extracted from the retina.
+    - "where": location tuple where glimpse was extracted.
+
+    Concretely, feeds the output of the retina `phi` to
+    a fc layer, the glimpse location vector `l_t_prev`
+    to a fc layer, and applies a ReLU nonlinearity to
+    their concatenation.
 
     In other words:
 
@@ -167,8 +179,8 @@ class glimpse_network(nn.Module):
     - c: number of channels in each image.
     - x: a 4D Tensor of shape (B, H, W, C). The minibatch
       of images.
-    - l: a 2D tensor of shape (B, 2). Contains the glimpse
-      coordinates [x, y].
+    - l_t_prev: a 2D tensor of shape (B, 2). Contains the glimpse
+      coordinates [x, y] for the previous timestep `t-1`.
 
     Returns
     -------
@@ -189,17 +201,17 @@ class glimpse_network(nn.Module):
         D_in = 2
         self.fc2 = nn.Linear(D_in, h_l)
 
-    def forward(self, x, l):
+    def forward(self, x, l_t_prev):
         # generate glimpse phi from image x
-        phi = self.retina(x, l)
+        phi = self.retina.foveate(x, l_t_prev)
 
-        # flatten both for fully-connected
+        # flatten both
         phi = phi.view(phi.size(0), -1)
-        l = l.view(l.size(0), -1)
+        l_t_prev = l_t_prev.view(l_t_prev.size(0), -1)
 
         # feed phi and l tgo respective fc layers
         phi_out = F.relu(self.fc1(phi))
-        l_out = F.relu(self.fc2(l))
+        l_out = F.relu(self.fc2(l_t_prev))
 
         # concatenate and apply nonlinearity
         g_t = F.relu(torch.cat([phi_out, l_out], dim=1))
@@ -209,10 +221,10 @@ class glimpse_network(nn.Module):
 
 class core_network(nn.Module):
     """
-    A RNN which maintains an internal state that integrates
+    An RNN which maintains an internal state that integrates
     information extracted from the history of past observations.
     It encodes the agent's knowledge of the environment through
-    a state vector `h` that gets updated at every time step `t`.
+    a state vector `h_t` that gets updated at every time step `t`.
 
     Concretely, it takes the glimpse representation `g_t` as input,
     and combines it with its internal state `h_t_prev` at the previous
@@ -230,13 +242,13 @@ class core_network(nn.Module):
     - g_t: a 2D tensor of shape (B, hidden_size). The glimpse
       representation returned by the glimpse network for the
       current timestep `t`.
-    - h_t: a 2D tensor of shape (B, hidden_size). The hidden state
-      vector for the current timestep `t`.
+    - h_t_prev: a 2D tensor of shape (B, hidden_size). The
+      hidden state vector for the previous timestep `t-1`.
 
     Returns
     -------
-    - h_t_next: a 2D tensor of shape (B, hidden_size). The hidden
-      state vector for the next timestep `t+1`.
+    - h_t: a 2D tensor of shape (B, hidden_size). The hidden
+      state vector for the current timestep `t`.
     """
 
     def __init__(self, input_size, hidden_size):
@@ -247,11 +259,11 @@ class core_network(nn.Module):
         self.i2h = nn.Linear(input_size, hidden_size)
         self.h2h = nn.Linear(hidden_size, hidden_size)
 
-    def forward(self, g_t, h_t):
+    def forward(self, g_t, h_t_prev):
         h1 = self.i2h(g_t)
-        h2 = self.h2h(h_t)
-        h_t_next = F.relu(h1 + h2)
-        return h_t_next
+        h2 = self.h2h(h_t_prev)
+        h_t = F.relu(h1 + h2)
+        return h_t
 
 
 class action_network(nn.Module):

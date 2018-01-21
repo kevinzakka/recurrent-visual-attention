@@ -20,7 +20,7 @@ Work In Progress
 
 The RAM model uses a non-differentiable attention mechanism. This means we cannot train it through standard backprop. Instead, we use REINFORCE, which allows us to train stochastic units through reinforcement learning.
 
-The RAM model uses the REINFORCE algorithm to train the locator network. The locator network passes the recurrent hidden state through an affine transform to produce a mean. The mean is used to parametrize a normal distribution with a fixed standard deviation (found using random search).
+The RAM model uses the REINFORCE algorithm to train the location network. The location network passes the recurrent hidden state through an affine transform to produce a mean. The mean is used to parametrize a normal distribution with a fixed standard deviation (found using random search).
 
 We need to implement `ReinforceNormal` which uses the REINFORCE algorithm for the normal distribution. It uses a reward function to compute `gradInputs` when `backward` is called.
 

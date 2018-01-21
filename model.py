@@ -45,12 +45,13 @@ class RecurrentAttention(nn.Module):
         - num_classes: number of classes in the dataset.
         - std: standard deviation of the Gaussian policy.
         """
+        super(RecurrentAttention, self).__init__()
         self.sensor = glimpse_network(h_g, h_l, g, k, s, c)
         self.rnn = core_network(hidden_size, hidden_size)
         self.locator = location_network(hidden_size, 2, std)
         self.classifier = action_network(hidden_size, num_classes)
 
-    def forward(self, x, l_t, h_t, last):
+    def forward(self, x, l_t_prev, h_t_prev, last=False):
         """
         Run the recurrent attention model for 1
         timestep.
@@ -59,33 +60,33 @@ class RecurrentAttention(nn.Module):
         ----
         - x: a 4D Tensor of shape (B, H, W, C). The minibatch
           of images.
-        - l_t: a 2D tensor of shape (B, 2). The location vector
-          containing the glimpse coordinates [x, y] for the current
-          timestep `t`.
-        - h_t: a 2D tensor of shape (B, hidden_size). The hidden
-          state vector for the current timestep `t`.
+        - l_t_prev: a 2D tensor of shape (B, 2). The location vector
+          containing the glimpse coordinates [x, y] for the previous
+          timestep `t-1`.
+        - h_t_prev: a 2D tensor of shape (B, hidden_size). The hidden
+          state vector for the previous timestep `t-1`.
         - last: a bool indicating whether this is the last timestep.
-          If it is, the action network returns an output probability
+          If True, the action network returns an output probability
           vector over the classes. Else, the core network returns the
           hidden state vector for the next timestep `t+1` and the
           location vector for the next timestep `t+1`.
 
         Returns
         -------
-        - l_t_next: a 2D tensor of shape (B, 2). The location vector
-          containing the glimpse coordinates [x, y] for the next
-          timestep `t+1`.
-        - h_t_next: a 2D tensor of shape (B, hidden_size). The hidden
-          state vector for the next timestep `t+1`.
+        - l_t: a 2D tensor of shape (B, 2). The location vector
+          containing the glimpse coordinates [x, y] for the
+          current timestep `t`.
+        - h_t: a 2D tensor of shape (B, hidden_size). The hidden
+          state vector for the current timestep `t`.
         - probas: a 2D tensor of shape (B, num_classes). The output
           probability vector over the classes.
         """
-        g_t = self.sensor(x, l_t)
-        h_t_next = self.rnn(g_t, h_t)
+        g_t = self.sensor(x, l_t_prev)
+        h_t = self.rnn(g_t, h_t_prev)
 
         if last:
-            probas = self.classifier(h_t_next)
+            probas = self.classifier(h_t)
             return probas
 
-        mean, l_t_next = self.locator(h_t_next)
-        return (h_t_next, l_t_next)
+        mean, l_t = self.locator(h_t)
+        return (h_t, l_t)
