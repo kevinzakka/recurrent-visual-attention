@@ -1,8 +1,5 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from torch.autograd import Variable
 from modules import glimpse_network, core_network
 from modules import action_network, location_network
 
@@ -27,14 +24,14 @@ class RecurrentAttention(nn.Module):
                  g=64,
                  k=3,
                  s=2,
-                 c=3,,
+                 c=3,
                  hidden_size=256,
                  num_classes=10,
                  std=0.11):
         """
         Initialize the recurrent attention model and its
         different submodules.
-        
+
         Args
         ----
         - h_g: hidden layer size of the fc layer for `phi`.
@@ -53,5 +50,42 @@ class RecurrentAttention(nn.Module):
         self.locator = location_network(hidden_size, 2, std)
         self.classifier = action_network(hidden_size, num_classes)
 
+    def forward(self, x, l_t, h_t, last):
+        """
+        Run the recurrent attention model for 1
+        timestep.
 
-    def forward():
+        Args
+        ----
+        - x: a 4D Tensor of shape (B, H, W, C). The minibatch
+          of images.
+        - l_t: a 2D tensor of shape (B, 2). The location vector
+          containing the glimpse coordinates [x, y] for the current
+          timestep `t`.
+        - h_t: a 2D tensor of shape (B, hidden_size). The hidden
+          state vector for the current timestep `t`.
+        - last: a bool indicating whether this is the last timestep.
+          If it is, the action network returns an output probability
+          vector over the classes. Else, the core network returns the
+          hidden state vector for the next timestep `t+1` and the
+          location vector for the next timestep `t+1`.
+
+        Returns
+        -------
+        - l_t_next: a 2D tensor of shape (B, 2). The location vector
+          containing the glimpse coordinates [x, y] for the next
+          timestep `t+1`.
+        - h_t_next: a 2D tensor of shape (B, hidden_size). The hidden
+          state vector for the next timestep `t+1`.
+        - probas: a 2D tensor of shape (B, num_classes). The output
+          probability vector over the classes.
+        """
+        g_t = self.sensor(x, l_t)
+        h_t_next = self.rnn(g_t, h_t)
+
+        if last:
+            probas = self.classifier(h_t_next)
+            return probas
+
+        mean, l_t_next = self.locator(h_t_next)
+        return (h_t_next, l_t_next)

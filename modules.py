@@ -24,11 +24,11 @@ class retina(object):
 
     Args
     ----
-    - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
-    - l: a minibatch of (x, y) coordinates in the range [-1, 1]
-      with the center corresponding to (0, 0) and the top left
-      corner corresponding to (-1, -1). l is a 2D Tensor of
-      shape (B, 2).
+    - x: a 4D Tensor of shape (B, H, W, C). The minibatch
+      of images.
+    - l: a 2D Tensor of shape (B, 2). l contains coordinates
+      in the range [-1, 1] with the center corresponding to (0, 0)
+      and the top left corner corresponding to (-1, -1).
     - g: height and width of the first extracted patch.
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
@@ -90,7 +90,8 @@ class retina(object):
 
         Args
         ----
-        - x: a 4D Tensor of shape (B, H, W, C).
+        - x: a 4D Tensor of shape (B, H, W, C). The minibatch
+          of images.
         - center: a 2D Tensor of shape (B, 2).
         - size: a scalar defining the size of the extracted patch.
 
@@ -164,13 +165,16 @@ class glimpse_network(nn.Module):
     - k: number of patches to extract per glimpse.
     - s: scaling factor that controls the size of successive patches.
     - c: number of channels in each image.
-    - x: a minibatch of images (4D Tensor) of shape (B, H, W, C).
-    - l: the location vector containing the glimpse coordinates [x, y]. 2D
-      tensor of shape (B, 2).
+    - x: a 4D Tensor of shape (B, H, W, C). The minibatch
+      of images.
+    - l: a 2D tensor of shape (B, 2). Contains the glimpse
+      coordinates [x, y].
 
     Returns
     -------
-    - g_t: glimpse representation vector.
+    - g_t: a 2D tensor of shape (B, hidden_size). The glimpse
+      representation returned by the glimpse network for the
+      current timestep `t`.
     """
 
     def __init__(self, h_g, h_l, g, k, s, c):
@@ -223,12 +227,16 @@ class core_network(nn.Module):
     ----
     - input_size: input size of the rnn.
     - hidden_size: hidden size of the rnn.
-    - g_t: the glimpse representation returned by the glimpse network.
-    - h_t_prev: hidden state vector at time step `t-1`.
+    - g_t: a 2D tensor of shape (B, hidden_size). The glimpse
+      representation returned by the glimpse network for the
+      current timestep `t`.
+    - h_t: a 2D tensor of shape (B, hidden_size). The hidden state
+      vector for the current timestep `t`.
 
     Returns
     -------
-    - h_t: hidden state vector at time step `t`.
+    - h_t_next: a 2D tensor of shape (B, hidden_size). The hidden
+      state vector for the next timestep `t+1`.
     """
 
     def __init__(self, input_size, hidden_size):
@@ -239,11 +247,11 @@ class core_network(nn.Module):
         self.i2h = nn.Linear(input_size, hidden_size)
         self.h2h = nn.Linear(hidden_size, hidden_size)
 
-    def forward(self, g_t, h_t_prev):
+    def forward(self, g_t, h_t):
         h1 = self.i2h(g_t)
-        h2 = self.h2h(h_t_prev)
-        h_t = F.relu(h1 + h2)
-        return h_t
+        h2 = self.h2h(h_t)
+        h_t_next = F.relu(h1 + h2)
+        return h_t_next
 
 
 class action_network(nn.Module):
@@ -320,8 +328,6 @@ class location_network(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        mean = F.tanh(self.fc(h_t))
-        mean = mean.detach()
-        l_t = F.tanh(Normal(mean, self.std).sample())
-        l_t = l_t.detach()
+        mean = F.tanh(self.fc(h_t)).detach()
+        l_t = F.tanh(Normal(mean, self.std).sample()).detach()
         return mean, l_t

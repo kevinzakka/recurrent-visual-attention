@@ -35,12 +35,13 @@ def main():
     a_t = classifier(h_t)
 
     loc_net = location_network(256, 2, 0.11)
-    l_t = loc_net(h_t)
+    mean, l_t = loc_net(h_t)
 
     print("g_t: {}".format(g_t.shape))
     print("h_t: {}".format(h_t.shape))
     print("l_t: {}".format(l_t.shape))
     print("a_t: {}".format(a_t.shape))
+
 
 if __name__ == '__main__':
     main()
