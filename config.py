@@ -36,7 +36,7 @@ core_arg.add_argument('--hidden_size', type=int, default=256,
                       help='hidden size of rnn')
 
 
-# reinforce
+# reinforce params
 reinforce_arg = add_argument_group('Reinforce Params')
 reinforce_arg.add_argument('--std', type=float, default=0.11,
                            help='gaussian policy standard deviation')
@@ -54,6 +54,7 @@ data_arg.add_argument('--shuffle', type=str2bool, default=True,
                       help='Whether to shuffle the train and valid indices')
 data_arg.add_argument('--show_sample', type=str2bool, default=True,
                       help='Whether to visualize a sample grid of the data')
+
 
 # training params
 train_arg = add_argument_group('Training Params')
@@ -83,11 +84,11 @@ misc_arg.add_argument('--ckpt_dir', type=str, default='./ckpt',
                       help='Directory in which to save model checkpoints')
 misc_arg.add_argument('--logs_dir', type=str, default='./logs/',
                       help='Directory in which Tensorboard logs wil be stored')
-misc_arg.add_argument('--use_tensorboard', type=str2bool, default=False,
+misc_arg.add_argument('--use_tensorboard', type=str2bool, default=True,
                       help='Whether to use tensorboard for visualization')
 misc_arg.add_argument('--resume', type=str2bool, default=False,
                       help='Whether to resume training from checkpoint')
-misc_arg.add_argument('--print_freq', type=int, default=10,
+misc_arg.add_argument('--print_freq', type=int, default=1,
                       help='How frequently to print training details')
 
 
