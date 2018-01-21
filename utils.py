@@ -1,19 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from PIL import Image
-
-
-def normalize(T, coords):
-    """
-    Convert coordinates in the range [0, T] to
-    coordinates in the range [-1, 1] where T is
-    the size of the image.
-    """
-    return (((2*coords.float()) / T) - 1)
-
-
-def str2bool(v):
-    return v.lower() in ('true', '1')
 
 
 def resize_array(x, size):
@@ -75,3 +63,59 @@ def array2img(x):
         x /= x_max
     x *= 255
     return Image.fromarray(x.astype('uint8'), 'RGB')
+
+
+def plot_images(images, gd_truth):
+
+    class_names = [
+        '1', '2', '3', '4', '5',
+        '6', '7', '8', '9'
+    ]
+
+    assert len(images) == len(cls_true) == 9
+
+    # Create figure with sub-plots.
+    fig, axes = plt.subplots(3, 3)
+
+    for i, ax in enumerate(axes.flat):
+        # plot the image
+        ax.imshow(images[i, :, :, :], interpolation='nearest')
+
+        # get its equivalent class name
+        gd_truth_name = class_names[gd_truth[i]]
+
+        xlabel = "{0} ({1})".format(gd_truth_name, gd_truth[i])
+        ax.set_xlabel(xlabel)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.show()
+
+
+def str2bool(v):
+    return v.lower() in ('true', '1')
+
+
+def prepare_dirs(config):
+    for path in [config.data_dir, config.ckpt_dir, config.logs_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+
+def save_config(config):
+    filename = get_model_name(config) + '_params.json'
+    param_path = os.path.join(config.ckpt_dir, filename)
+
+    print("[*] Model Checkpoint Dir: {}".format(config.ckpt_dir))
+    print("[*] Param Path: {}".format(param_path))
+
+    with open(param_path, 'w') as fp:
+        json.dump(config.__dict__, fp, indent=4, sort_keys=True)
+
+
+def get_model_name(config):
+        if config.bottleneck:
+            return 'DenseNet-BC-{}-{}'.format(
+                config.num_layers_total, config.dataset)
+        return 'DenseNet-{}-{}'.format(
+            config.num_layers_total, config.dataset)
