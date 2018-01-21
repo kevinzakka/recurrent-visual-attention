@@ -69,11 +69,7 @@ def array2img(x):
 
 def plot_images(images, gd_truth):
 
-    class_names = [
-        '1', '2', '3', '4', '5',
-        '6', '7', '8', '9'
-    ]
-
+    images = images.squeeze()
     assert len(images) == len(gd_truth) == 9
 
     # Create figure with sub-plots.
@@ -81,21 +77,14 @@ def plot_images(images, gd_truth):
 
     for i, ax in enumerate(axes.flat):
         # plot the image
-        ax.imshow(images[i, :, :, :], interpolation='nearest')
+        ax.imshow(images[i], cmap="Greys_r")
 
-        # get its equivalent class name
-        gd_truth_name = class_names[gd_truth[i]]
-
-        xlabel = "{0} ({1})".format(gd_truth_name, gd_truth[i])
+        xlabel = "{}".format(gd_truth[i])
         ax.set_xlabel(xlabel)
         ax.set_xticks([])
         ax.set_yticks([])
 
     plt.show()
-
-
-def str2bool(v):
-    return v.lower() in ('true', '1')
 
 
 def prepare_dirs(config):
@@ -107,7 +96,7 @@ def prepare_dirs(config):
 def save_config(config):
     model_name = 'ram_{}_{}x{}_{}'.format(
         config.num_glimpses, config.patch_size,
-        config.patch_size, config.patch_scale
+        config.patch_size, config.glimpse_scale
     )
     filename = model_name + '_params.json'
     param_path = os.path.join(config.ckpt_dir, filename)

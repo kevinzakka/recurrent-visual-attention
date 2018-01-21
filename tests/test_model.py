@@ -28,7 +28,7 @@ def main():
     l_t_prev = Variable(l_t_prev)
     h_t_prev = Variable(torch.zeros(B, 256))
 
-    ram = RecurrentAttention()
+    ram = RecurrentAttention(128, 128, 64, 3, 2, 3, 256, 10, 0.11)
     h_t, l_t = ram(imgs, l_t_prev, h_t_prev)
 
     print("h_t: {}".format(h_t.shape))

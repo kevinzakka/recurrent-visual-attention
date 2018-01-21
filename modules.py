@@ -158,13 +158,13 @@ class glimpse_network(nn.Module):
     - "where": location tuple where glimpse was extracted.
 
     Concretely, feeds the output of the retina `phi` to
-    a fc layer, the glimpse location vector `l_t_prev`
-    to a fc layer, and applies a ReLU nonlinearity to
-    their concatenation.
+    a fc layer and the glimpse location vector `l_t_prev`
+    to a fc layer. Finally, their concatenation is fed
+    through another fc layer.
 
     In other words:
 
-        `g_t = relu( fc(l) || fc(phi) )`
+        `g_t = fc( fc(l) || fc(phi) )`
 
     where `||` signifies a concatenation.
 
@@ -201,6 +201,9 @@ class glimpse_network(nn.Module):
         D_in = 2
         self.fc2 = nn.Linear(D_in, h_l)
 
+        # what-where layer
+        self.fc3 = nn.Linear(h_g+h_l, h_g+h_l)
+
     def forward(self, x, l_t_prev):
         # generate glimpse phi from image x
         phi = self.retina.foveate(x, l_t_prev)
@@ -209,12 +212,15 @@ class glimpse_network(nn.Module):
         phi = phi.view(phi.size(0), -1)
         l_t_prev = l_t_prev.view(l_t_prev.size(0), -1)
 
-        # feed phi and l tgo respective fc layers
+        # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l_t_prev))
 
-        # concatenate and apply nonlinearity
-        g_t = F.relu(torch.cat([phi_out, l_out], dim=1))
+        # concatenate
+        what_where = torch.cat([phi_out, l_out], dim=1)
+
+        # feed to fc layer
+        g_t = F.relu(self.fc3(what_where))
 
         return g_t
 

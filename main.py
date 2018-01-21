@@ -29,14 +29,14 @@ def main(config):
     # instantiate trainer
     trainer = Trainer(config, data_loader)
 
-    # either train
-    if config.is_train:
-        save_config(config)
-        trainer.train()
+    # # either train
+    # if config.is_train:
+    #     save_config(config)
+    #     trainer.train()
 
-    # or load a pretrained model and test
-    else:
-        trainer.test()
+    # # or load a pretrained model and test
+    # else:
+    #     trainer.test()
 
 
 if __name__ == '__main__':

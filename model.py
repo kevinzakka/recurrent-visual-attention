@@ -19,15 +19,15 @@ class RecurrentAttention(nn.Module):
     - Minh et. al., https://arxiv.org/abs/1406.6247
     """
     def __init__(self,
-                 h_g=128,
-                 h_l=128,
-                 g=64,
-                 k=3,
-                 s=2,
-                 c=3,
-                 hidden_size=256,
-                 num_classes=10,
-                 std=0.11):
+                 h_g,
+                 h_l,
+                 g,
+                 k,
+                 s,
+                 c,
+                 hidden_size,
+                 num_classes,
+                 std):
         """
         Initialize the recurrent attention model and its
         different submodules.
