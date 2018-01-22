@@ -27,8 +27,6 @@ class Trainer(object):
         - data_loader: data iterator
         """
         self.config = config
-        self.num_classes = 10
-        self.num_channels = 1
 
         # glimpse network params
         self.patch_size = config.patch_size
@@ -50,6 +48,8 @@ class Trainer(object):
             self.valid_loader = data_loader[1]
         else:
             self.test_loader = data_loader
+        self.num_classes = 10
+        self.num_channels = 1
 
         # training params
         self.epochs = config.epochs
@@ -149,30 +149,27 @@ class Trainer(object):
 
         tic = time.time()
         for i, (img, target) in enumerate(self.train_loader):
-            img_var = Variable(img)
-            target_var = Variable(target)
+            img, target = Variable(img), Variable(target)
 
+            # initialize location and hidden state vectors
+            l_t = Variable(
+                torch.Tensor(
+                    self.batch_size, 2
+                ).uniform_(-1, 1)
+            )
+            h_t = Variable(
+                torch.zeros(self.batch_size, self.hidden_size)
+            )
             self.locs = []
             for t in range(self.num_glimpses - 1):
-                if t == 0:
-                    # initialize location and hidden state vectors
-                    l_t = Variable(
-                        torch.Tensor(
-                            self.batch_size, 2
-                        ).uniform_(-1, 1)
-                    )
-                    h_t = Variable(
-                        torch.zeros(self.batch_size, self.hidden_size)
-                    )
-
                 # forward pass through model
-                h_t, l_t = self.model(img_var, l_t, h_t)
+                h_t, l_t = self.model(img, l_t, h_t)
 
                 # bookeeping for later plotting
                 self.locs.append(l_t)
 
             # last iteration
-            probas = self.model(img_var, l_t, h_t, last=True)
+            probas = self.model(img, l_t, h_t, last=True)
 
             # to be continued
 

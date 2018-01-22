@@ -34,7 +34,6 @@ class retina(object):
     - phi: a 5D tensor of shape (B, k, g, g, C). The
       foveated glimpse of the image.
     """
-
     def __init__(self, g, k, s):
         self.g = g
         self.k = k
@@ -188,7 +187,6 @@ class glimpse_network(nn.Module):
       representation returned by the glimpse network for the
       current timestep `t`.
     """
-
     def __init__(self, h_g, h_l, g, k, s, c):
         super(glimpse_network, self).__init__()
         self.retina = retina(g, k, s)
@@ -256,7 +254,6 @@ class core_network(nn.Module):
     - h_t: a 2D tensor of shape (B, hidden_size). The hidden
       state vector for the current timestep `t`.
     """
-
     def __init__(self, input_size, hidden_size):
         super(core_network, self).__init__()
         self.input_size = input_size
@@ -297,7 +294,6 @@ class action_network(nn.Module):
     -------
     - a_t: output probability vector over the classes.
     """
-
     def __init__(self, input_size, output_size):
         super(action_network, self).__init__()
         self.fc = nn.Linear(input_size, output_size)
@@ -339,7 +335,6 @@ class location_network(nn.Module):
     - mean: a 2D vector of shape (B, 2).
     - l_t: a 2D vector of shape (B, 2).
     """
-
     def __init__(self, input_size, output_size, std):
         super(location_network, self).__init__()
         self.std = std
@@ -349,3 +344,32 @@ class location_network(nn.Module):
         mean = F.tanh(self.fc(h_t)).detach()
         l_t = F.tanh(Normal(mean, self.std).sample()).detach()
         return mean, l_t
+
+
+class baseline_network(nn.Module):
+    """
+    A 2 layer fc network that regresses the baseline
+    in the reward function to reduce the variance
+    of the gradient update.
+
+    Args
+    ----
+    - input_size: input size of the fc layer.
+    - hidden_size: hidden size of the fc layer.
+    - output_size: output size of the fc layer.
+    - h_t: the hidden state vector of the core network
+      at time step `t`.
+
+    Returns
+    -------
+    - b_t: a 1D vector of shape (B,)
+    """
+    def __init__(self, input_size, hidden_size, output_size):
+        super(baseline_network, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, h_t):
+        b_t = F.relu(self.fc1(h_t))
+        b_t = F.relu(self.fc2(b_t))
+        return b_t
