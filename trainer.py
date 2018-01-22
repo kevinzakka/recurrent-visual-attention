@@ -1,10 +1,14 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from torch.autograd import Variable
+
 import os
 import time
-import torch
 import shutil
 
 from tqdm import trange
-from torch.autograd import Variable
 from model import RecurrentAttention
 from tensorboard_logger import configure, log_value
 
@@ -76,16 +80,6 @@ class Trainer(object):
             config.patch_size, config.glimpse_scale
         )
 
-        # build RAM model
-        self.model = RecurrentAttention(
-            self.loc_hidden, self.glimpse_hidden, self.patch_size,
-            self.num_patches, self.glimpse_scale, self.num_channels,
-            self.hidden_size, self.num_classes, self.std,
-        )
-
-        print('[*] Number of model parameters: {:,}'.format(
-            sum([p.data.nelement() for p in self.model.parameters()])))
-
         # configure tensorboard logging
         if self.use_tensorboard:
             tensorboard_dir = self.logs_dir + self.model_name
@@ -93,6 +87,32 @@ class Trainer(object):
             if not os.path.exists(tensorboard_dir):
                 os.makedirs(tensorboard_dir)
             configure(tensorboard_dir)
+
+        # build RAM model
+        self.model = RecurrentAttention(
+            self.patch_size, self.num_patches, self.glimpse_scale,
+            self.num_channels, self.loc_hidden, self.glimpse_hidden,
+            self.std, self.hidden_size, self.num_classes,
+        )
+
+        print('[*] Number of model parameters: {:,}'.format(
+            sum([p.data.nelement() for p in self.model.parameters()])))
+
+        self.clear()
+
+    def clear(self):
+        """
+        Reset the hidden state of the core network and
+        a few bookeeping variables.
+
+        This is called once every time a new minibatch
+        `x` is introduced.
+        """
+        self.loss = 0.
+        self.accuracy = 0.
+
+        self.h_t = torch.zeros(self.batch_size, self.hidden_size)
+        self.h_t = Variable(h_t)
 
     def train(self):
         """
@@ -102,9 +122,6 @@ class Trainer(object):
         and if the validation accuracy is improved upon,
         a separate ckpt is created for use on the test set.
         """
-        # switch to train mode for dropout
-        self.model.train()
-
         # load the most recent checkpoint
         if self.resume:
             self.load_checkpoint(best=False)
@@ -148,25 +165,43 @@ class Trainer(object):
         accs = AverageMeter()
 
         tic = time.time()
-        for i, (img, target) in enumerate(self.train_loader):
-            img, target = Variable(img), Variable(target)
+        for i, (x, y) in enumerate(self.train_loader):
+            x, y = Variable(x), Variable(y)
 
-            # initialize location and hidden state vectors
-            h_t = torch.zeros(self.batch_size, self.hidden_size)
+            self.clear()
+
+            # initialize location vector
             l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-            h_t, l_t = Variable(h_t), Variable(l_t)
+            l_t = Variable(l_t)
 
+            # extract the glimpses
+            sum_grad_log_pi = 0.
             for t in range(self.num_glimpses - 1):
-                # forward pass through model
-                h_t, l_t = self.model(img, l_t, h_t)
 
-                # bookeeping for later plotting
-                self.locs.append(l_t)
+                # forward pass through model
+                self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
+
+                # compute gradient of log of policy across batch
+                grad_log_pi = (mu-l_t) / (self.std*self.std)
+
+                # accumulate
+                sum_grad_log_pi += grad_log_pi
 
             # last iteration
-            probas = self.model(img, l_t, h_t, last=True)
+            self.h_t, mu, l_t, b_t, log_probas = self.model(
+                img, l_t, self.h_t, last=True
+            )
 
-            # to be continued
+            # calculate reward
+            R = (torch.max(log_probas, 1)[1] == y)
+
+            # compute losses for differentiable modules
+            self.loss_action = F.nll_loss(log_probas, y)
+            self.loss_baseline = F.mse_loss(R, b_t)
+
+            # compute reinforce loss
+            
+
 
 
     def anneal_learning_rate(self, epoch):

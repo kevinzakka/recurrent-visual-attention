@@ -299,7 +299,7 @@ class action_network(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        a_t = F.softmax(self.fc(h_t), dim=1)
+        a_t = F.log_softmax(self.fc(h_t), dim=1)
         return a_t
 
 
@@ -320,8 +320,6 @@ class location_network(nn.Module):
     from a distribution conditioned on an affine
     transformation of the hidden state vector `h_t`.
 
-    Todo: add arg for training vs testing.
-
     Args
     ----
     - input_size: input size of the fc layer.
@@ -332,7 +330,7 @@ class location_network(nn.Module):
 
     Returns
     -------
-    - mean: a 2D vector of shape (B, 2).
+    - mu: a 2D vector of shape (B, 2).
     - l_t: a 2D vector of shape (B, 2).
     """
     def __init__(self, input_size, output_size, std):
@@ -340,10 +338,27 @@ class location_network(nn.Module):
         self.std = std
         self.fc = nn.Linear(input_size, output_size)
 
+    def gaussian(self, mu):
+        B = mu.shape[0]
+
+        # initialize standard normal
+        zeros = torch.zeros(B, 2)
+        ones = torch.ones(B, 2)
+        gauss = Normal(zeros, ones)
+
+        # sample from standard normal
+        x = Variable(gauss.sample())
+
+        # shift to desired mean and std
+        x = mu + self.std*x
+
+        return x
+
     def forward(self, h_t):
-        mean = F.tanh(self.fc(h_t)).detach()
-        l_t = F.tanh(Normal(mean, self.std).sample()).detach()
-        return mean, l_t
+        mu = F.tanh(self.fc(h_t))
+        l_t = F.tanh(self.gaussian(mu))
+
+        return mu, l_t
 
 
 class baseline_network(nn.Module):

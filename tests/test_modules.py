@@ -2,9 +2,10 @@ import sys
 sys.path.append("..")
 
 import torch
+from torch.autograd import Variable
+from torch.distributions import Normal
 
 from utils import img2array
-from torch.autograd import Variable
 from modules import baseline_network
 from modules import glimpse_network, core_network
 from modules import action_network, location_network
@@ -39,7 +40,7 @@ def main():
     a_t = classifier(h_t)
 
     loc_net = location_network(256, 2, 0.11)
-    mean, l_t = loc_net(h_t)
+    mu, l_t = loc_net(h_t)
 
     base = baseline_network(256, 1)
     b_t = base(h_t)
