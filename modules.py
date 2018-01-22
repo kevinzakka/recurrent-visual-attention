@@ -287,8 +287,8 @@ class action_network(nn.Module):
     ----
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
-    - h_t: the hidden state vector of the core network at
-      time step `t`.
+    - h_t: the hidden state vector of the core network for
+      the current time step `t`.
 
     Returns
     -------
@@ -327,8 +327,8 @@ class location_network(nn.Module):
     - input_size: input size of the fc layer.
     - output_size: output size of the fc layer.
     - std: standard deviation of the normal distribution.
-    - h_t: the hidden state vector of the core network at
-      time step `t`.
+    - h_t: the hidden state vector of the core network for
+      the current time step `t`.
 
     Returns
     -------
@@ -348,28 +348,25 @@ class location_network(nn.Module):
 
 class baseline_network(nn.Module):
     """
-    A 2 layer fc network that regresses the baseline
-    in the reward function to reduce the variance
-    of the gradient update.
+    Regresses the baseline in the reward function
+    to reduce the variance of the gradient update.
 
     Args
     ----
     - input_size: input size of the fc layer.
-    - hidden_size: hidden size of the fc layer.
     - output_size: output size of the fc layer.
     - h_t: the hidden state vector of the core network
-      at time step `t`.
+      for the current time step `t`.
 
     Returns
     -------
-    - b_t: a 1D vector of shape (B,)
+    - b_t: a 2D vector of shape (B, 1). The baseline
+      for the current time step `t`.
     """
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, output_size):
         super(baseline_network, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        b_t = F.relu(self.fc1(h_t))
-        b_t = F.relu(self.fc2(b_t))
+        b_t = F.relu(self.fc(h_t))
         return b_t

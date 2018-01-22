@@ -5,6 +5,7 @@ import torch
 
 from utils import img2array
 from torch.autograd import Variable
+from modules import baseline_network
 from modules import glimpse_network, core_network
 from modules import action_network, location_network
 
@@ -40,10 +41,14 @@ def main():
     loc_net = location_network(256, 2, 0.11)
     mean, l_t = loc_net(h_t)
 
+    base = baseline_network(256, 1)
+    b_t = base(h_t)
+
     print("g_t: {}".format(g_t.shape))
     print("h_t: {}".format(h_t.shape))
     print("l_t: {}".format(l_t.shape))
     print("a_t: {}".format(a_t.shape))
+    print("b_t: {}".format(b_t.shape))
 
 
 if __name__ == '__main__':

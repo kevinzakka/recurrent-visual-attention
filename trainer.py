@@ -152,15 +152,10 @@ class Trainer(object):
             img, target = Variable(img), Variable(target)
 
             # initialize location and hidden state vectors
-            l_t = Variable(
-                torch.Tensor(
-                    self.batch_size, 2
-                ).uniform_(-1, 1)
-            )
-            h_t = Variable(
-                torch.zeros(self.batch_size, self.hidden_size)
-            )
-            self.locs = []
+            h_t = torch.zeros(self.batch_size, self.hidden_size)
+            l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
+            h_t, l_t = Variable(h_t), Variable(l_t)
+
             for t in range(self.num_glimpses - 1):
                 # forward pass through model
                 h_t, l_t = self.model(img, l_t, h_t)
