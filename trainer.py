@@ -31,6 +31,11 @@ class Trainer(object):
         self.num_channels = 1
 
         # glimpse network params
+        self.patch_size = config.patch_size
+        self.glimpse_scale = config.glimpse_scale
+        self.num_patches = config.num_patches
+        self.loc_hidden = config.loc_hidden
+        self.glimpse_hidden = config.glimpse_hidden
 
         # core network params
         self.num_glimpses = config.num_glimpses
@@ -65,6 +70,7 @@ class Trainer(object):
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
         self.print_freq = config.print_freq
+        self.batch_size = config.batch_size
         self.model_name = 'ram_{}_{}x{}_{}'.format(
             config.num_glimpses, config.patch_size,
             config.patch_size, config.glimpse_scale
@@ -72,9 +78,9 @@ class Trainer(object):
 
         # build RAM model
         self.model = RecurrentAttention(
-            config.loc_hidden, config.glimpse_hidden, config.patch_size,
-            config.num_patches, config.glimpse_scale, self.num_channels,
-            config.hidden_size, self.num_classes, config.std,
+            self.loc_hidden, self.glimpse_hidden, self.patch_size,
+            self.num_patches, self.glimpse_scale, self.num_channels,
+            self.hidden_size, self.num_classes, self.std,
         )
 
         print('[*] Number of model parameters: {:,}'.format(
@@ -142,43 +148,34 @@ class Trainer(object):
         accs = AverageMeter()
 
         tic = time.time()
-        for i, (image, target) in enumerate(self.train_loader):
-            input_var = Variable(image)
+        for i, (img, target) in enumerate(self.train_loader):
+            img_var = Variable(img)
             target_var = Variable(target)
 
-            # forward pass
-            output = self.model(input_var)
+            self.locs = []
+            for t in range(self.num_glimpses - 1):
+                if t == 0:
+                    # initialize location and hidden state vectors
+                    l_t = Variable(
+                        torch.Tensor(
+                            self.batch_size, 2
+                        ).uniform_(-1, 1)
+                    )
+                    h_t = Variable(
+                        torch.zeros(self.batch_size, self.hidden_size)
+                    )
 
-            # compute loss & accuracy
-            loss = self.criterion(output, target_var)
-            acc = self.accuracy(output.data, target)
-            losses.update(loss.data[0], image.size()[0])
-            accs.update(acc, image.size()[0])
+                # forward pass through model
+                h_t, l_t = self.model(img_var, l_t, h_t)
 
-            # compute gradients and update SGD
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+                # bookeeping for later plotting
+                self.locs.append(l_t)
 
-            # measure elapsed time
-            toc = time.time()
-            batch_time.update(toc-tic)
+            # last iteration
+            probas = self.model(img_var, l_t, h_t, last=True)
 
-            # print to screen
-            if i % self.print_freq == 0:
-                print(
-                    'Epoch: [{0}][{1}/{2}]\t'
-                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Train Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'Train Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
-                        epoch, i, len(self.train_loader),
-                        batch_time=batch_time, loss=losses, acc=accs)
-                )
+            # to be continued
 
-        # log to tensorboard
-        if self.use_tensorboard:
-            log_value('train_loss', losses.avg, epoch)
-            log_value('train_acc', accs.avg, epoch)
 
     def anneal_learning_rate(self, epoch):
         """
