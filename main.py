@@ -29,6 +29,9 @@ def main(config):
     # instantiate trainer
     trainer = Trainer(config, data_loader)
 
+    save_config(config)
+    trainer.train()
+
     # # either train
     # if config.is_train:
     #     save_config(config)

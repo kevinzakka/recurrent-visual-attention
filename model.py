@@ -100,7 +100,7 @@ class RecurrentAttention(nn.Module):
 
         if last:
             log_probas = self.classifier(h_t)
-            b_t = self.baseliner(h_t)
+            b_t = self.baseliner(h_t).squeeze()
             return (h_t, mu, l_t, b_t, log_probas)
 
-        return (h_t, mu, l_t, None, None)
+        return (h_t, mu, l_t)

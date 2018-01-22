@@ -3,12 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.autograd import Variable
+from torch.optim import SGD
 
 import os
 import time
 import shutil
 
 from tqdm import trange
+from utils import AverageMeter
 from model import RecurrentAttention
 from tensorboard_logger import configure, log_value
 
@@ -74,7 +76,6 @@ class Trainer(object):
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
         self.print_freq = config.print_freq
-        self.batch_size = config.batch_size
         self.model_name = 'ram_{}_{}x{}_{}'.format(
             config.num_glimpses, config.patch_size,
             config.patch_size, config.glimpse_scale
@@ -98,7 +99,10 @@ class Trainer(object):
         print('[*] Number of model parameters: {:,}'.format(
             sum([p.data.nelement() for p in self.model.parameters()])))
 
-        self.clear()
+        # initialize optimizer
+        self.optimizer = SGD(
+            self.model.parameters(), lr=self.lr, momentum=self.momentum,
+        )
 
     def clear(self):
         """
@@ -108,11 +112,8 @@ class Trainer(object):
         This is called once every time a new minibatch
         `x` is introduced.
         """
-        self.loss = 0.
-        self.accuracy = 0.
-
         self.h_t = torch.zeros(self.batch_size, self.hidden_size)
-        self.h_t = Variable(h_t)
+        self.h_t = Variable(self.h_t)
 
     def train(self):
         """
@@ -168,6 +169,7 @@ class Trainer(object):
         for i, (x, y) in enumerate(self.train_loader):
             x, y = Variable(x), Variable(y)
 
+            self.batch_size = x.shape[0]
             self.clear()
 
             # initialize location vector
@@ -181,35 +183,158 @@ class Trainer(object):
                 # forward pass through model
                 self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
 
-                # compute gradient of log of policy across batch
+                # compute gradient of log of policy and accumulate
                 grad_log_pi = (mu-l_t) / (self.std*self.std)
-
-                # accumulate
-                sum_grad_log_pi += grad_log_pi
+                sum_grad_log_pi += torch.sum(grad_log_pi, dim=1)
 
             # last iteration
             self.h_t, mu, l_t, b_t, log_probas = self.model(
-                img, l_t, self.h_t, last=True
+                x, l_t, self.h_t, last=True
             )
 
             # calculate reward
-            R = (torch.max(log_probas, 1)[1] == y)
+            predicted = torch.max(log_probas, 1)[1]
+            R = (predicted == y).float()
 
             # compute losses for differentiable modules
             self.loss_action = F.nll_loss(log_probas, y)
-            self.loss_baseline = F.mse_loss(R, b_t)
+            self.loss_baseline = F.mse_loss(b_t, R)
 
             # compute reinforce loss
-            
+            adjusted_reward = R - b_t
+            self.reinforce_loss = torch.mean(
+                adjusted_reward*sum_grad_log_pi
+            )
 
+            # compute composite loss
+            self.loss = self.loss_action + \
+                self.loss_baseline + self.reinforce_loss
 
+            # compute accuracy
+            total = len(y)
+            correct = R.sum()
+            self.acc = 100 * (correct / total)
+
+            # store
+            losses.update(self.loss.data[0], x.size()[0])
+            accs.update(self.acc.data[0], x.size()[0])
+
+            # compute gradients and update SGD
+            self.optimizer.zero_grad()
+            self.loss.backward()
+            self.optimizer.step()
+
+            # measure elapsed time
+            toc = time.time()
+            batch_time.update(toc-tic)
+
+            # print to screen
+            if i % self.print_freq == 0:
+                print(
+                    'Epoch: [{0}][{1}/{2}]\t'
+                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Train Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'Train Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
+                        epoch, i, len(self.train_loader),
+                        batch_time=batch_time, loss=losses, acc=accs)
+                )
+
+        # log to tensorboard
+        if self.use_tensorboard:
+            log_value('train_loss', losses.avg, epoch)
+            log_value('train_acc', accs.avg, epoch)
+
+    def validate(self, epoch):
+        """
+        Evaluate the model on the validation set.
+        """
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        accs = AverageMeter()
+
+        tic = time.time()
+        for i, (x, y) in enumerate(self.valid_loader):
+            x = Variable(x, volatile=True)
+            y = Variable(y, volatile=True)
+
+            self.batch_size = x.shape[0]
+            self.clear()
+
+            # initialize location vector
+            l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
+            l_t = Variable(l_t)
+
+            # extract the glimpses
+            sum_grad_log_pi = 0.
+            for t in range(self.num_glimpses - 1):
+
+                # forward pass through model
+                self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
+
+                # compute gradient of log of policy and accumulate
+                grad_log_pi = (mu-l_t) / (self.std*self.std)
+                sum_grad_log_pi += torch.sum(grad_log_pi, dim=1)
+
+            # last iteration
+            self.h_t, mu, l_t, b_t, log_probas = self.model(
+                x, l_t, self.h_t, last=True
+            )
+
+            # calculate reward
+            predicted = torch.max(log_probas, 1)[1]
+            R = (predicted == y).float()
+
+            # compute losses for differentiable modules
+            self.loss_action = F.nll_loss(log_probas, y)
+            self.loss_baseline = F.mse_loss(b_t, R)
+
+            # compute reinforce loss
+            adjusted_reward = R - b_t
+            self.reinforce_loss = torch.mean(
+                adjusted_reward*sum_grad_log_pi
+            )
+
+            # compute composite loss
+            self.loss = self.loss_action + \
+                self.loss_baseline + self.reinforce_loss
+
+            # compute accuracy
+            total = len(y)
+            correct = R.sum()
+            self.acc = 100 * (correct / total)
+
+            # store
+            losses.update(self.loss.data[0], x.size()[0])
+            accs.update(self.acc.data[0], x.size()[0])
+
+            # measure elapsed time
+            toc = time.time()
+            batch_time.update(toc-tic)
+
+            # print to screen
+            if i % self.print_freq == 0:
+                print('Valid: [{0}/{1}]\t'
+                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Valid Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'Valid Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
+                        i, len(self.valid_loader), batch_time=batch_time,
+                        loss=losses, acc=accs))
+
+        print('[*] Valid Acc: {acc.avg:.3f}'.format(acc=accs))
+
+        # log to tensorboard
+        if self.use_tensorboard:
+            log_value('val_loss', losses.avg, epoch)
+            log_value('val_acc', accs.avg, epoch)
+
+        return accs.avg
 
     def anneal_learning_rate(self, epoch):
         """
         This function linearly decays the learning rate
         to a predefined minimum over a set amount of epochs.
         """
-        self.lr -= self.decay
+        self.lr -= self.decay_rate
 
         # log to tensorboard
         if self.use_tensorboard:
@@ -271,21 +396,3 @@ class Trainer(object):
             with best valid acc of {:.3f}".format(
                 filename, ckpt['epoch'], ckpt['best_valid_acc'])
         )
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count

@@ -53,6 +53,9 @@ class retina(object):
         phi = []
         size = self.g
 
+        # B, H, W, C
+        x = x.permute(0, 2, 3, 1)
+
         # extract k patches of decreasing resolution
         for i in range(self.k):
             phi.append(self.extract_patch(x, l, size))

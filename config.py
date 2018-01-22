@@ -46,13 +46,13 @@ reinforce_arg.add_argument('--std', type=float, default=0.11,
 data_arg = add_argument_group('Data Params')
 data_arg.add_argument('--valid_size', type=float, default=0.1,
                       help='Proportion of training set used for validation')
-data_arg.add_argument('--batch_size', type=int, default=20,
+data_arg.add_argument('--batch_size', type=int, default=64,
                       help='# of images in each batch of data')
 data_arg.add_argument('--num_workers', type=int, default=4,
                       help='# of subprocesses to use for data loading')
 data_arg.add_argument('--shuffle', type=str2bool, default=True,
                       help='Whether to shuffle the train and valid indices')
-data_arg.add_argument('--show_sample', type=str2bool, default=True,
+data_arg.add_argument('--show_sample', type=str2bool, default=False,
                       help='Whether to visualize a sample grid of the data')
 
 
@@ -68,7 +68,7 @@ train_arg.add_argument('--init_lr', type=float, default=0.01,
                        help='Initial learning rate value')
 train_arg.add_argument('--min_lr', type=float, default=0.00001,
                        help='Min learning rate value')
-train_arg.add_argument('--saturate_epoch', type=int, default=800,
+train_arg.add_argument('--saturate_epoch', type=int, default=1,
                        help='Epoch at which decayed lr will reach min_lr')
 train_arg.add_argument('--patience', type=int, default=100,
                        help='Max # of epochs to wait for no validation improv')
@@ -84,11 +84,11 @@ misc_arg.add_argument('--ckpt_dir', type=str, default='./ckpt',
                       help='Directory in which to save model checkpoints')
 misc_arg.add_argument('--logs_dir', type=str, default='./logs/',
                       help='Directory in which Tensorboard logs wil be stored')
-misc_arg.add_argument('--use_tensorboard', type=str2bool, default=True,
+misc_arg.add_argument('--use_tensorboard', type=str2bool, default=False,
                       help='Whether to use tensorboard for visualization')
 misc_arg.add_argument('--resume', type=str2bool, default=False,
                       help='Whether to resume training from checkpoint')
-misc_arg.add_argument('--print_freq', type=int, default=1,
+misc_arg.add_argument('--print_freq', type=int, default=10,
                       help='How frequently to print training details')
 
 
