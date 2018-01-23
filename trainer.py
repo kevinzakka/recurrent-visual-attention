@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.autograd import Variable
@@ -104,10 +103,9 @@ class Trainer(object):
             self.model.parameters(), lr=self.lr, momentum=self.momentum,
         )
 
-    def clear(self):
+    def reset(self):
         """
-        Reset the hidden state of the core network and
-        a few bookeeping variables.
+        Initialize the hidden state of the core network.
 
         This is called once every time a new minibatch
         `x` is introduced.
@@ -135,6 +133,7 @@ class Trainer(object):
 
             # train for 1 epoch
             self.train_one_epoch(epoch)
+            return
 
             # evaluate on validation set
             valid_acc = self.validate(epoch)
@@ -170,22 +169,22 @@ class Trainer(object):
             x, y = Variable(x), Variable(y)
 
             self.batch_size = x.shape[0]
-            self.clear()
+            self.reset()
 
             # initialize location vector
             l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
             l_t = Variable(l_t)
 
             # extract the glimpses
-            sum_grad_log_pi = 0.
+            sum_log_pi = 0.
             for t in range(self.num_glimpses - 1):
 
                 # forward pass through model
                 self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
 
                 # compute gradient of log of policy and accumulate
-                grad_log_pi = (mu-l_t) / (self.std*self.std)
-                sum_grad_log_pi += torch.sum(grad_log_pi, dim=1)
+                log_pi = (l_t-mu)**2 / (2*self.std**2)
+                sum_log_pi += torch.sum(log_pi, dim=1)
 
             # last iteration
             self.h_t, mu, l_t, b_t, log_probas = self.model(
@@ -197,31 +196,29 @@ class Trainer(object):
             R = (predicted == y).float()
 
             # compute losses for differentiable modules
-            self.loss_action = F.nll_loss(log_probas, y)
-            self.loss_baseline = F.mse_loss(b_t, R)
+            loss_action = F.nll_loss(log_probas, y)
+            loss_baseline = F.mse_loss(b_t, R)
 
             # compute reinforce loss
-            adjusted_reward = R - b_t.detach()
-            self.reinforce_loss = torch.mean(
-                adjusted_reward*sum_grad_log_pi
-            )
+            adjusted_reward = R - b_t
+            mean_log_pi = sum_log_pi / (self.num_glimpses - 1)
+            loss_reinforce = torch.mean(adjusted_reward*mean_log_pi)
 
-            # compute composite loss
-            self.loss = self.loss_action + \
-                self.loss_baseline + self.reinforce_loss
+            # compute hybrid loss
+            loss = loss_action + loss_baseline + loss_reinforce
 
             # compute accuracy
             total = len(y)
             correct = R.sum()
-            self.acc = 100 * (correct / total)
+            acc = 100 * (correct / total)
 
             # store
-            losses.update(self.loss.data[0], x.size()[0])
-            accs.update(self.acc.data[0], x.size()[0])
+            losses.update(loss.data[0], x.size()[0])
+            accs.update(acc.data[0], x.size()[0])
 
             # compute gradients and update SGD
             self.optimizer.zero_grad()
-            self.loss.backward()
+            loss.backward()
             self.optimizer.step()
 
             # measure elapsed time
@@ -258,7 +255,7 @@ class Trainer(object):
             y = Variable(y, volatile=True)
 
             self.batch_size = x.shape[0]
-            self.clear()
+            self.reset()
 
             # initialize location vector
             l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
@@ -290,8 +287,9 @@ class Trainer(object):
 
             # compute reinforce loss
             adjusted_reward = R - b_t
+            mean_grad_log_pi = sum_grad_log_pi / (self.num_glimpses - 1)
             self.reinforce_loss = torch.mean(
-                adjusted_reward*sum_grad_log_pi
+                adjusted_reward*mean_grad_log_pi
             )
 
             # compute composite loss
@@ -313,12 +311,14 @@ class Trainer(object):
 
             # print to screen
             if i % self.print_freq == 0:
-                print('Valid: [{0}/{1}]\t'
+                print(
+                    'Valid: [{0}/{1}]\t'
                     'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                     'Valid Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
                     'Valid Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
-                        i, len(self.valid_loader), batch_time=batch_time,
-                        loss=losses, acc=accs))
+                        i, len(self.valid_loader),
+                        batch_time=batch_time, loss=losses, acc=accs)
+                )
 
         print('[*] Valid Acc: {acc.avg:.3f}'.format(acc=accs))
 

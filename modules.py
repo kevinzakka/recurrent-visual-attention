@@ -1,12 +1,13 @@
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import resize_array
 from torch.autograd import Variable
 from torch.distributions import Normal
+
+import numpy as np
+
+from utils import resize_array
 
 
 class retina(object):
@@ -161,14 +162,12 @@ class glimpse_network(nn.Module):
 
     Concretely, feeds the output of the retina `phi` to
     a fc layer and the glimpse location vector `l_t_prev`
-    to a fc layer. Finally, their concatenation is fed
-    through another fc layer.
+    to a fc layer. Finally, these outputs are fed each
+    through a fc layer and their sum is rectified.
 
     In other words:
 
-        `g_t = fc( fc(l) || fc(phi) )`
-
-    where `||` signifies a concatenation.
+        `g_t = relu( fc( fc(l) ) + fc( fc(phi) ) )`
 
     Args
     ----
@@ -203,7 +202,7 @@ class glimpse_network(nn.Module):
         self.fc2 = nn.Linear(D_in, h_l)
 
         # what-where layer
-        self.fc3 = nn.Linear(h_g+h_l, h_g+h_l)
+        self.fc3 = nn.Linear(h_g, h_g+h_l)
 
     def forward(self, x, l_t_prev):
         # generate glimpse phi from image x
@@ -217,11 +216,11 @@ class glimpse_network(nn.Module):
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l_t_prev))
 
-        # concatenate
-        what_where = torch.cat([phi_out, l_out], dim=1)
+        what = self.fc3(phi_out)
+        where = self.fc3(l_out)
 
         # feed to fc layer
-        g_t = F.relu(self.fc3(what_where))
+        g_t = F.relu(what + where)
 
         return g_t
 
@@ -358,9 +357,8 @@ class location_network(nn.Module):
         return x
 
     def forward(self, h_t):
-        mu = F.tanh(self.fc(h_t)).detach()
-        l_t = F.tanh(self.gaussian(mu)).detach()
-
+        mu = F.tanh(self.fc(h_t))
+        l_t = F.tanh(self.gaussian(mu))
         return mu, l_t
 
 
