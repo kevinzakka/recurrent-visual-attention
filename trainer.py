@@ -178,20 +178,20 @@ class Trainer(object):
             l_t = Variable(l_t)
 
             # extract the glimpses
-            sum_log_pi = 0.
+            log_pi = 0.
             for t in range(self.num_glimpses - 1):
 
                 # forward pass through model
-                self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
+                self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
 
-                # compute gradient of log of policy and accumulate
-                log_pi = (l_t-mu)**2 / (2*self.std**2)
-                sum_log_pi += torch.sum(log_pi, dim=1)
+                # accumulate log of policy
+                log_pi += p
 
             # last iteration
-            self.h_t, mu, l_t, b_t, log_probas = self.model(
+            self.h_t, mu, l_t, p, b_t, log_probas = self.model(
                 x, l_t, self.h_t, last=True
             )
+            log_pi += p
 
             # calculate reward
             predicted = torch.max(log_probas, 1)[1]
@@ -203,10 +203,10 @@ class Trainer(object):
 
             # compute reinforce loss
             adjusted_reward = R - b_t
-            mean_log_pi = sum_log_pi / (self.num_glimpses - 1)
-            loss_reinforce = torch.mean(adjusted_reward*mean_log_pi)
+            log_pi = log_pi / self.num_glimpses
+            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
-            # compute hybrid loss
+            # sum up into a hybrid loss
             loss = loss_action + loss_baseline + loss_reinforce
 
             # compute accuracy
@@ -217,11 +217,11 @@ class Trainer(object):
             accs.update(acc.data[0], x.size()[0])
 
             # compute gradients and update SGD
-            # a = list(self.model.locator.parameters())[0].clone()
+            # a = list(self.model.rnn.parameters())[0].clone()
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            # b = list(self.model.locator.parameters())[0].clone()
+            # b = list(self.model.rnn.parameters())[0].clone()
             # assert(torch.equal(a.data, b.data))
 
             # measure elapsed time
@@ -265,48 +265,43 @@ class Trainer(object):
             l_t = Variable(l_t)
 
             # extract the glimpses
-            sum_grad_log_pi = 0.
+            log_pi = 0.
             for t in range(self.num_glimpses - 1):
 
                 # forward pass through model
-                self.h_t, mu, l_t = self.model(x, l_t, self.h_t)
+                self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
 
-                # compute gradient of log of policy and accumulate
-                grad_log_pi = (mu-l_t) / (self.std*self.std)
-                sum_grad_log_pi += torch.sum(grad_log_pi, dim=1)
+                # accumulate log of policy
+                log_pi += p
 
             # last iteration
-            self.h_t, mu, l_t, b_t, log_probas = self.model(
+            self.h_t, mu, l_t, p, b_t, log_probas = self.model(
                 x, l_t, self.h_t, last=True
             )
+            log_pi += p
 
             # calculate reward
             predicted = torch.max(log_probas, 1)[1]
             R = (predicted == y).float()
 
             # compute losses for differentiable modules
-            self.loss_action = F.nll_loss(log_probas, y)
-            self.loss_baseline = F.mse_loss(b_t, R)
+            loss_action = F.nll_loss(log_probas, y)
+            loss_baseline = F.mse_loss(b_t, R)
 
             # compute reinforce loss
             adjusted_reward = R - b_t
-            mean_grad_log_pi = sum_grad_log_pi / (self.num_glimpses - 1)
-            self.reinforce_loss = torch.mean(
-                adjusted_reward*mean_grad_log_pi
-            )
+            log_pi = log_pi / self.num_glimpses
+            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
-            # compute composite loss
-            self.loss = self.loss_action + \
-                self.loss_baseline + self.reinforce_loss
+            # sum up into a hybrid loss
+            loss = loss_action + loss_baseline + loss_reinforce
 
             # compute accuracy
-            total = len(y)
-            correct = R.sum()
-            self.acc = 100 * (correct / total)
+            acc = 100 * (R.sum() / len(y))
 
             # store
-            losses.update(self.loss.data[0], x.size()[0])
-            accs.update(self.acc.data[0], x.size()[0])
+            losses.update(loss.data[0], x.size()[0])
+            accs.update(acc.data[0], x.size()[0])
 
             # measure elapsed time
             toc = time.time()

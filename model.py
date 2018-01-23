@@ -1,3 +1,6 @@
+import math
+
+import torch
 import torch.nn as nn
 
 from modules import baseline_network
@@ -31,7 +34,7 @@ class RecurrentAttention(nn.Module):
                  num_classes):
         """
         Initialize the recurrent attention model and its
-        different submodules.
+        different components.
 
         Args
         ----
@@ -49,11 +52,26 @@ class RecurrentAttention(nn.Module):
           i.e. number of BPTT steps.
         """
         super(RecurrentAttention, self).__init__()
+        self.std = std
+        self.var = self.std ** 2
+
         self.sensor = glimpse_network(h_g, h_l, g, k, s, c)
         self.rnn = core_network(hidden_size, hidden_size)
         self.locator = location_network(hidden_size, 2, std)
         self.classifier = action_network(hidden_size, num_classes)
         self.baseliner = baseline_network(hidden_size, 1)
+
+    def normal_log_prob(self, v, loc):
+        """
+        Compute the log of the Gaussian policy parametrized
+        by mean `loc` and standard deviation `scale` evaluated
+        at `v`.
+        """
+        p1 = ((v - loc) ** 2) / (-2 * self.var)
+        p2 = - math.log(self.std)
+        p3 = - math.log(math.sqrt(2 * math.pi))
+
+        return torch.sum((p1 + p2 + p3), dim=1)
 
     def forward(self, x, l_t_prev, h_t_prev, last=False):
         """
@@ -94,9 +112,11 @@ class RecurrentAttention(nn.Module):
         h_t = self.rnn(g_t, h_t_prev)
         mu, l_t = self.locator(h_t)
 
+        log_pi = self.normal_log_prob(l_t, mu)
+
         if last:
             log_probas = self.classifier(h_t)
             b_t = self.baseliner(h_t).squeeze()
-            return (h_t, mu, l_t, b_t, log_probas)
+            return (h_t, mu, l_t, log_pi, b_t, log_probas)
 
-        return (h_t, mu, l_t)
+        return (h_t, mu, l_t, log_pi)
