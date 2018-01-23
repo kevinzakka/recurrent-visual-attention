@@ -201,7 +201,7 @@ class Trainer(object):
             self.loss_baseline = F.mse_loss(b_t, R)
 
             # compute reinforce loss
-            adjusted_reward = R - b_t
+            adjusted_reward = R - b_t.detach()
             self.reinforce_loss = torch.mean(
                 adjusted_reward*sum_grad_log_pi
             )

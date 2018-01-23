@@ -358,8 +358,8 @@ class location_network(nn.Module):
         return x
 
     def forward(self, h_t):
-        mu = F.tanh(self.fc(h_t))
-        l_t = F.tanh(self.gaussian(mu))
+        mu = F.tanh(self.fc(h_t)).detach()
+        l_t = F.tanh(self.gaussian(mu)).detach()
 
         return mu, l_t
 
