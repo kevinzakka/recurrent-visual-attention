@@ -8,7 +8,7 @@ import os
 import time
 import shutil
 
-from tqdm import trange
+from tqdm import tqdm
 from utils import AverageMeter
 from model import RecurrentAttention
 from tensorboard_logger import configure, log_value
@@ -67,6 +67,8 @@ class Trainer(object):
         self.lr = self.init_lr
 
         # misc params
+        self.num_train = len(self.train_loader) * config.batch_size
+        self.num_valid = len(self.valid_loader) * config.batch_size
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
@@ -125,7 +127,13 @@ class Trainer(object):
         if self.resume:
             self.load_checkpoint(best=False)
 
-        for epoch in trange(self.start_epoch, self.epochs):
+        print("[*] Train on {} samples, validate on {} samples".format(
+            self.num_train, self.num_valid)
+        )
+
+        for epoch in range(self.start_epoch, self.epochs):
+
+            print('\nEpoch: {}/{}'.format(epoch+1, self.epochs))
 
             # decay learning rate
             if epoch < self.saturate_epoch:
@@ -133,7 +141,6 @@ class Trainer(object):
 
             # train for 1 epoch
             self.train_one_epoch(epoch)
-            return
 
             # evaluate on validation set
             valid_acc = self.validate(epoch)
@@ -165,84 +172,81 @@ class Trainer(object):
         accs = AverageMeter()
 
         tic = time.time()
-        for i, (x, y) in enumerate(self.train_loader):
-            if i > 0:
-                return
-            x, y = Variable(x), Variable(y)
+        with tqdm(total=self.num_train) as pbar:
+            for i, (x, y) in enumerate(self.train_loader):
+                x, y = Variable(x), Variable(y)
 
-            self.batch_size = x.shape[0]
-            self.reset()
+                self.batch_size = x.shape[0]
+                self.reset()
 
-            # initialize location vector
-            l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-            l_t = Variable(l_t)
+                # initialize location vector
+                l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
+                l_t = Variable(l_t)
 
-            # extract the glimpses
-            log_pi = 0.
-            for t in range(self.num_glimpses - 1):
+                # extract the glimpses
+                log_pi = 0.
+                for t in range(self.num_glimpses - 1):
 
-                # forward pass through model
-                self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
+                    # forward pass through model
+                    self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
 
-                # accumulate log of policy
+                    # accumulate log of policy
+                    log_pi += p
+
+                # last iteration
+                self.h_t, mu, l_t, p, b_t, log_probas = self.model(
+                    x, l_t, self.h_t, last=True
+                )
                 log_pi += p
 
-            # last iteration
-            self.h_t, mu, l_t, p, b_t, log_probas = self.model(
-                x, l_t, self.h_t, last=True
-            )
-            log_pi += p
+                # calculate reward
+                predicted = torch.max(log_probas, 1)[1]
+                R = (predicted == y).float()
 
-            # calculate reward
-            predicted = torch.max(log_probas, 1)[1]
-            R = (predicted == y).float()
+                # compute losses for differentiable modules
+                loss_action = F.nll_loss(log_probas, y)
+                loss_baseline = F.mse_loss(b_t, R)
 
-            # compute losses for differentiable modules
-            loss_action = F.nll_loss(log_probas, y)
-            loss_baseline = F.mse_loss(b_t, R)
+                # compute reinforce loss
+                adjusted_reward = R - b_t
+                log_pi = log_pi / self.num_glimpses
+                loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
-            # compute reinforce loss
-            adjusted_reward = R - b_t
-            log_pi = log_pi / self.num_glimpses
-            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+                # sum up into a hybrid loss
+                loss = loss_action + loss_baseline + loss_reinforce
 
-            # sum up into a hybrid loss
-            loss = loss_action + loss_baseline + loss_reinforce
+                # compute accuracy
+                acc = 100 * (R.sum() / len(y))
 
-            # compute accuracy
-            acc = 100 * (R.sum() / len(y))
+                # store
+                losses.update(loss.data[0], x.size()[0])
+                accs.update(acc.data[0], x.size()[0])
 
-            # store
-            losses.update(loss.data[0], x.size()[0])
-            accs.update(acc.data[0], x.size()[0])
+                # compute gradients and update SGD
+                # a = list(self.model.rnn.parameters())[0].clone()
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                # b = list(self.model.rnn.parameters())[0].clone()
+                # assert(torch.equal(a.data, b.data))
 
-            # compute gradients and update SGD
-            # a = list(self.model.rnn.parameters())[0].clone()
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-            # b = list(self.model.rnn.parameters())[0].clone()
-            # assert(torch.equal(a.data, b.data))
+                # measure elapsed time
+                toc = time.time()
+                batch_time.update(toc-tic)
 
-            # measure elapsed time
-            toc = time.time()
-            batch_time.update(toc-tic)
-
-            # print to screen
-            if i % self.print_freq == 0:
-                print(
-                    'Epoch: [{0}][{1}/{2}]\t'
-                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Train Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'Train Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
-                        epoch, i, len(self.train_loader),
-                        batch_time=batch_time, loss=losses, acc=accs)
+                pbar.set_description(
+                    (
+                        "{:.1f}s - loss: {:.3f} - acc: {:.3f}".format(
+                            (toc-tic), loss.data[0], acc.data[0]
+                            )
+                    )
                 )
+                pbar.update(self.batch_size)
 
-        # log to tensorboard
-        if self.use_tensorboard:
-            log_value('train_loss', losses.avg, epoch)
-            log_value('train_acc', accs.avg, epoch)
+            # log to tensorboard
+            if self.use_tensorboard:
+                log_value('train_loss', losses.avg, epoch)
+                log_value('train_acc', accs.avg, epoch)
 
     def validate(self, epoch):
         """
@@ -253,72 +257,68 @@ class Trainer(object):
         accs = AverageMeter()
 
         tic = time.time()
-        for i, (x, y) in enumerate(self.valid_loader):
-            x = Variable(x, volatile=True)
-            y = Variable(y, volatile=True)
+        with tqdm(total=self.num_valid) as pbar:
+            for i, (x, y) in enumerate(self.valid_loader):
+                x = Variable(x, volatile=True)
+                y = Variable(y, volatile=True)
 
-            self.batch_size = x.shape[0]
-            self.reset()
+                self.batch_size = x.shape[0]
+                self.reset()
 
-            # initialize location vector
-            l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-            l_t = Variable(l_t)
+                # initialize location vector
+                l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
+                l_t = Variable(l_t)
 
-            # extract the glimpses
-            log_pi = 0.
-            for t in range(self.num_glimpses - 1):
+                # extract the glimpses
+                log_pi = 0.
+                for t in range(self.num_glimpses - 1):
 
-                # forward pass through model
-                self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
+                    # forward pass through model
+                    self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
 
-                # accumulate log of policy
+                    # accumulate log of policy
+                    log_pi += p
+
+                # last iteration
+                self.h_t, mu, l_t, p, b_t, log_probas = self.model(
+                    x, l_t, self.h_t, last=True
+                )
                 log_pi += p
 
-            # last iteration
-            self.h_t, mu, l_t, p, b_t, log_probas = self.model(
-                x, l_t, self.h_t, last=True
-            )
-            log_pi += p
+                # calculate reward
+                predicted = torch.max(log_probas, 1)[1]
+                R = (predicted == y).float()
 
-            # calculate reward
-            predicted = torch.max(log_probas, 1)[1]
-            R = (predicted == y).float()
+                # compute losses for differentiable modules
+                loss_action = F.nll_loss(log_probas, y)
+                loss_baseline = F.mse_loss(b_t, R)
 
-            # compute losses for differentiable modules
-            loss_action = F.nll_loss(log_probas, y)
-            loss_baseline = F.mse_loss(b_t, R)
+                # compute reinforce loss
+                adjusted_reward = R - b_t
+                log_pi = log_pi / self.num_glimpses
+                loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
-            # compute reinforce loss
-            adjusted_reward = R - b_t
-            log_pi = log_pi / self.num_glimpses
-            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+                # sum up into a hybrid loss
+                loss = loss_action + loss_baseline + loss_reinforce
 
-            # sum up into a hybrid loss
-            loss = loss_action + loss_baseline + loss_reinforce
+                # compute accuracy
+                acc = 100 * (R.sum() / len(y))
 
-            # compute accuracy
-            acc = 100 * (R.sum() / len(y))
+                # store
+                losses.update(loss.data[0], x.size()[0])
+                accs.update(acc.data[0], x.size()[0])
 
-            # store
-            losses.update(loss.data[0], x.size()[0])
-            accs.update(acc.data[0], x.size()[0])
+                # measure elapsed time
+                toc = time.time()
+                batch_time.update(toc-tic)
 
-            # measure elapsed time
-            toc = time.time()
-            batch_time.update(toc-tic)
-
-            # print to screen
-            if i % self.print_freq == 0:
-                print(
-                    'Valid: [{0}/{1}]\t'
-                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Valid Loss: {loss.val:.4f} ({loss.avg:.4f})\t'
-                    'Valid Acc: {acc.val:.3f} ({acc.avg:.3f})'.format(
-                        i, len(self.valid_loader),
-                        batch_time=batch_time, loss=losses, acc=accs)
+                pbar.set_description(
+                    (
+                        "{:.1f}s - valid loss: {:.3f} - valid acc: {:.3f}".format(
+                            (toc-tic), loss.data[0], acc.data[0])
+                    )
                 )
-
-        print('[*] Valid Acc: {acc.avg:.3f}'.format(acc=accs))
+                pbar.update(self.batch_size)
 
         # log to tensorboard
         if self.use_tensorboard:
@@ -361,7 +361,7 @@ class Trainer(object):
             shutil.copyfile(
                 ckpt_path, os.path.join(self.ckpt_dir, filename)
             )
-            print("[*] ==== Best Valid Acc Achieved ====")
+            print("[!] Best valid acc achieved...")
 
     def load_checkpoint(self, best=False):
         """
