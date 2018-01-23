@@ -166,6 +166,8 @@ class Trainer(object):
 
         tic = time.time()
         for i, (x, y) in enumerate(self.train_loader):
+            if i > 0:
+                return
             x, y = Variable(x), Variable(y)
 
             self.batch_size = x.shape[0]
@@ -208,18 +210,19 @@ class Trainer(object):
             loss = loss_action + loss_baseline + loss_reinforce
 
             # compute accuracy
-            total = len(y)
-            correct = R.sum()
-            acc = 100 * (correct / total)
+            acc = 100 * (R.sum() / len(y))
 
             # store
             losses.update(loss.data[0], x.size()[0])
             accs.update(acc.data[0], x.size()[0])
 
             # compute gradients and update SGD
+            # a = list(self.model.locator.parameters())[0].clone()
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            # b = list(self.model.locator.parameters())[0].clone()
+            # assert(torch.equal(a.data, b.data))
 
             # measure elapsed time
             toc = time.time()
