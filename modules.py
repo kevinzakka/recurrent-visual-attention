@@ -54,9 +54,6 @@ class retina(object):
         phi = []
         size = self.g
 
-        # B, H, W, C
-        x = x.permute(0, 2, 3, 1)
-
         # extract k patches of decreasing resolution
         for i in range(self.k):
             phi.append(self.extract_patch(x, l, size))
@@ -205,6 +202,9 @@ class glimpse_network(nn.Module):
         self.fc3 = nn.Linear(h_g, h_g+h_l)
 
     def forward(self, x, l_t_prev):
+        # B, H, W, C
+        x = x.permute(0, 2, 3, 1)
+
         # generate glimpse phi from image x
         phi = self.retina.foveate(x, l_t_prev)
 

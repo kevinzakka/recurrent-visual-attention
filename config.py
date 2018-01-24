@@ -30,15 +30,15 @@ glimpse_arg.add_argument('--glimpse_hidden', type=int, default=128,
 
 # core network params
 core_arg = add_argument_group('Core Network Params')
-core_arg.add_argument('--num_glimpses', type=int, default=7,
-                      help='# of glimpses, i.e. BPTT iters')
+core_arg.add_argument('--num_glimpses', type=int, default=6,
+                      help='# of glimpses, i.e. BPTT iterations')
 core_arg.add_argument('--hidden_size', type=int, default=256,
                       help='hidden size of rnn')
 
 
 # reinforce params
 reinforce_arg = add_argument_group('Reinforce Params')
-reinforce_arg.add_argument('--std', type=float, default=0.11,
+reinforce_arg.add_argument('--std', type=float, default=0.15,
                            help='gaussian policy standard deviation')
 
 
@@ -46,7 +46,7 @@ reinforce_arg.add_argument('--std', type=float, default=0.11,
 data_arg = add_argument_group('Data Params')
 data_arg.add_argument('--valid_size', type=float, default=0.1,
                       help='Proportion of training set used for validation')
-data_arg.add_argument('--batch_size', type=int, default=100,
+data_arg.add_argument('--batch_size', type=int, default=20,
                       help='# of images in each batch of data')
 data_arg.add_argument('--num_workers', type=int, default=4,
                       help='# of subprocesses to use for data loading')
@@ -64,7 +64,7 @@ train_arg.add_argument('--momentum', type=float, default=0.9,
                        help='Nesterov momentum value')
 train_arg.add_argument('--epochs', type=int, default=2000,
                        help='# of epochs to train for')
-train_arg.add_argument('--init_lr', type=float, default=0.01,
+train_arg.add_argument('--init_lr', type=float, default=0.001,
                        help='Initial learning rate value')
 train_arg.add_argument('--min_lr', type=float, default=0.00001,
                        help='Min learning rate value')
@@ -76,7 +76,7 @@ train_arg.add_argument('--patience', type=int, default=100,
 
 # other params
 misc_arg = add_argument_group('Misc.')
-misc_arg.add_argument('--random_seed', type=int, default=7821,
+misc_arg.add_argument('--random_seed', type=int, default=42,
                       help='Seed to ensure reproducibility')
 misc_arg.add_argument('--data_dir', type=str, default='./data',
                       help='Directory in which data is stored')

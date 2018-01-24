@@ -320,6 +320,8 @@ class Trainer(object):
                 )
                 pbar.update(self.batch_size)
 
+        print('[*] Avg Valid Acc: {acc.avg:.3f}'.format(acc=accs))
+
         # log to tensorboard
         if self.use_tensorboard:
             log_value('val_loss', losses.avg, epoch)

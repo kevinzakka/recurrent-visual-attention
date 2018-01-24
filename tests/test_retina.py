@@ -12,19 +12,18 @@ from torch.autograd import Variable
 # params
 TEST_GLIMPSE = True
 TEST_BOUNDING = True
+SAVE = True
 plot_dir = '../plots/'
 data_dir = '../data/'
 
 
 def denormalize(T, coords):
     """
-    Convert coordinate in the range [-1, 1] to
-    coordinates in the range [0, T] where T
-    is the size of the image.
+    Convert coordinates in the range [-1, 1] to
+    coordinates in the range [0, T] where T is
+    the size of the image.
     """
-    x = 0.5 * ((coords[:, 0] + 1.0) * T)
-    y = 0.5 * ((coords[:, 1] + 1.0) * T)
-    return torch.stack([x, y], dim=1).long()
+    return (0.5 * ((coords + 1.0) * T)).long()
 
 
 def bounding_box(x, y, size, color='w'):
@@ -46,7 +45,7 @@ def main():
         imgs.append(torch.from_numpy(img))
     imgs = Variable(torch.cat(imgs))
 
-    loc = Variable(torch.Tensor([[-1., -1.], [-1., -1.]]))
+    loc = Variable(torch.Tensor([[0., 0.], [0., 0.]]))
 
     if TEST_GLIMPSE:
 
@@ -61,9 +60,9 @@ def main():
                 axs[i, j].imshow(glimpse[i, j, :])
                 axs[i, j].get_xaxis().set_visible(False)
                 axs[i, j].get_yaxis().set_visible(False)
-        # plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
-        #             bbox_inches='tight')
-        # plt.show()
+        if SAVE:
+            plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=300,
+                        bbox_inches='tight')
 
     if TEST_BOUNDING:
 
@@ -81,9 +80,11 @@ def main():
                 size = size * 2
             ax[i].get_xaxis().set_visible(False)
             ax[i].get_yaxis().set_visible(False)
-        # plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
-        #             bbox_inches='tight')
-        plt.show()
+        if SAVE:
+            plt.savefig(plot_dir + 'bbox.png', format='png', dpi=300,
+                        bbox_inches='tight')
+
+    plt.show()
 
 
 if __name__ == '__main__':
