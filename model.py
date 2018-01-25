@@ -73,7 +73,7 @@ class RecurrentAttention(nn.Module):
 
         return torch.sum((p1 + p2 + p3), dim=1)
 
-    def forward(self, x, l_t_prev, h_t_prev, last=False):
+    def forward(self, x, l_t_prev, h_t_prev, last=False, train=True):
         """
         Run the recurrent attention model for 1 timestep
         on the minibatch of images `x`.
@@ -117,6 +117,10 @@ class RecurrentAttention(nn.Module):
         if last:
             log_probas = self.classifier(h_t)
             b_t = self.baseliner(h_t).squeeze()
-            return (h_t, mu, l_t, log_pi, b_t, log_probas)
+            if train:
+                return (h_t, l_t, log_pi, b_t, log_probas)
+            return (h_t, mu, log_probas)
 
-        return (h_t, mu, l_t, log_pi)
+        if train:
+            return (h_t, l_t, log_pi)
+        return (h_t, mu)

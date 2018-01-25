@@ -62,13 +62,13 @@ class Trainer(object):
         self.saturate_epoch = config.saturate_epoch
         self.init_lr = config.init_lr
         self.min_lr = config.min_lr
-        self.decay_rate = (self.init_lr - self.min_lr) / (self.saturate_epoch)
+        self.decay_rate = (self.min_lr - self.init_lr) / (self.saturate_epoch)
         self.momentum = config.momentum
         self.lr = self.init_lr
 
         # misc params
-        self.num_train = len(self.train_loader) * config.batch_size
-        self.num_valid = len(self.valid_loader) * config.batch_size
+        self.num_train = len(self.train_loader.sampler.indices)
+        self.num_valid = len(self.valid_loader.sampler.indices)
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
@@ -107,13 +107,19 @@ class Trainer(object):
 
     def reset(self):
         """
-        Initialize the hidden state of the core network.
+        Initialize the hidden state of the core network
+        and the location vector.
 
         This is called once every time a new minibatch
         `x` is introduced.
         """
-        self.h_t = torch.zeros(self.batch_size, self.hidden_size)
-        self.h_t = Variable(self.h_t)
+        h_t = torch.zeros(self.batch_size, self.hidden_size)
+        h_t = Variable(h_t)
+
+        l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
+        l_t = Variable(l_t)
+
+        return h_t, l_t
 
     def train(self):
         """
@@ -127,26 +133,37 @@ class Trainer(object):
         if self.resume:
             self.load_checkpoint(best=False)
 
-        print("[*] Train on {} samples, validate on {} samples".format(
+        print("\n[*] Train on {} samples, validate on {} samples".format(
             self.num_train, self.num_valid)
         )
 
         for epoch in range(self.start_epoch, self.epochs):
 
-            print('\nEpoch: {}/{}'.format(epoch+1, self.epochs))
-
             # decay learning rate
             if epoch < self.saturate_epoch:
                 self.anneal_learning_rate(epoch)
 
+            print(
+                '\nEpoch: {}/{} - LR: {:.6f}'.format(
+                    epoch+1, self.epochs, self.lr)
+            )
+
             # train for 1 epoch
-            self.train_one_epoch(epoch)
+            train_loss, train_acc = self.train_one_epoch(epoch)
 
             # evaluate on validation set
-            valid_acc = self.validate(epoch)
+            valid_loss, valid_acc = self.validate(epoch)
+
+            is_best = valid_acc > self.best_valid_acc
+
+            msg1 = "train loss: {:.3f} - train acc: {:.3f} "
+            msg2 = "- val loss: {:.3f} - val acc: {:.3f}"
+            if is_best:
+                msg2 += " [*]"
+            msg = msg1 + msg2
+            print(msg.format(train_loss, train_acc, valid_loss, valid_acc))
 
             # check for improvement
-            is_best = valid_acc > self.best_valid_acc
             if not is_best:
                 self.counter += 1
             if self.counter > self.patience:
@@ -176,26 +193,23 @@ class Trainer(object):
             for i, (x, y) in enumerate(self.train_loader):
                 x, y = Variable(x), Variable(y)
 
+                # initialize hidden state vector
                 self.batch_size = x.shape[0]
-                self.reset()
-
-                # initialize location vector
-                l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-                l_t = Variable(l_t)
+                h_t, l_t = self.reset()
 
                 # extract the glimpses
                 log_pi = 0.
                 for t in range(self.num_glimpses - 1):
 
                     # forward pass through model
-                    self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
+                    h_t, l_t, p = self.model(x, l_t, h_t)
 
                     # accumulate log of policy
                     log_pi += p
 
                 # last iteration
-                self.h_t, mu, l_t, p, b_t, log_probas = self.model(
-                    x, l_t, self.h_t, last=True
+                h_t, l_t, p, b_t, log_probas = self.model(
+                    x, l_t, h_t, last=True
                 )
                 log_pi += p
 
@@ -223,12 +237,9 @@ class Trainer(object):
                 accs.update(acc.data[0], x.size()[0])
 
                 # compute gradients and update SGD
-                # a = list(self.model.rnn.parameters())[0].clone()
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                # b = list(self.model.rnn.parameters())[0].clone()
-                # assert(torch.equal(a.data, b.data))
 
                 # measure elapsed time
                 toc = time.time()
@@ -248,93 +259,73 @@ class Trainer(object):
                 log_value('train_loss', losses.avg, epoch)
                 log_value('train_acc', accs.avg, epoch)
 
+            return losses.avg, accs.avg
+
     def validate(self, epoch):
         """
         Evaluate the model on the validation set.
         """
-        batch_time = AverageMeter()
         losses = AverageMeter()
         accs = AverageMeter()
 
-        tic = time.time()
-        with tqdm(total=self.num_valid) as pbar:
-            for i, (x, y) in enumerate(self.valid_loader):
-                x = Variable(x, volatile=True)
-                y = Variable(y, volatile=True)
+        for i, (x, y) in enumerate(self.valid_loader):
+            x, y = Variable(x), Variable(y)
 
-                self.batch_size = x.shape[0]
-                self.reset()
+            self.batch_size = x.shape[0]
+            h_t, l_t = self.reset()
 
-                # initialize location vector
-                l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-                l_t = Variable(l_t)
+            # extract the glimpses
+            log_pi = 0.
+            for t in range(self.num_glimpses - 1):
 
-                # extract the glimpses
-                log_pi = 0.
-                for t in range(self.num_glimpses - 1):
+                # forward pass through model
+                h_t, l_t, p = self.model(x, l_t, h_t)
 
-                    # forward pass through model
-                    self.h_t, mu, l_t, p = self.model(x, l_t, self.h_t)
-
-                    # accumulate log of policy
-                    log_pi += p
-
-                # last iteration
-                self.h_t, mu, l_t, p, b_t, log_probas = self.model(
-                    x, l_t, self.h_t, last=True
-                )
+                # accumulate log of policy
                 log_pi += p
 
-                # calculate reward
-                predicted = torch.max(log_probas, 1)[1]
-                R = (predicted == y).float()
+            # last iteration
+            h_t, l_t, p, b_t, log_probas = self.model(
+                x, l_t, h_t, last=True
+            )
+            log_pi += p
 
-                # compute losses for differentiable modules
-                loss_action = F.nll_loss(log_probas, y)
-                loss_baseline = F.mse_loss(b_t, R)
+            # calculate reward
+            predicted = torch.max(log_probas, 1)[1]
+            R = (predicted == y).float()
 
-                # compute reinforce loss
-                adjusted_reward = R - b_t
-                log_pi = log_pi / self.num_glimpses
-                loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+            # compute losses for differentiable modules
+            loss_action = F.nll_loss(log_probas, y)
+            loss_baseline = F.mse_loss(b_t, R)
 
-                # sum up into a hybrid loss
-                loss = loss_action + loss_baseline + loss_reinforce
+            # compute reinforce loss
+            adjusted_reward = R - b_t
+            log_pi = log_pi / self.num_glimpses
+            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
-                # compute accuracy
-                acc = 100 * (R.sum() / len(y))
+            # sum up into a hybrid loss
+            loss = loss_action + loss_baseline + loss_reinforce
 
-                # store
-                losses.update(loss.data[0], x.size()[0])
-                accs.update(acc.data[0], x.size()[0])
+            # compute accuracy
+            acc = 100 * (R.sum() / len(y))
 
-                # measure elapsed time
-                toc = time.time()
-                batch_time.update(toc-tic)
-
-                pbar.set_description(
-                    (
-                        "{:.1f}s - valid loss: {:.3f} - valid acc: {:.3f}".format(
-                            (toc-tic), loss.data[0], acc.data[0])
-                    )
-                )
-                pbar.update(self.batch_size)
-
-        print('[*] Avg Valid Acc: {acc.avg:.3f}'.format(acc=accs))
+            # store
+            losses.update(loss.data[0], x.size()[0])
+            accs.update(acc.data[0], x.size()[0])
 
         # log to tensorboard
         if self.use_tensorboard:
-            log_value('val_loss', losses.avg, epoch)
-            log_value('val_acc', accs.avg, epoch)
+            log_value('valid_loss', losses.avg, epoch)
+            log_value('valid_acc', accs.avg, epoch)
 
-        return accs.avg
+        return losses.avg, accs.avg
 
     def anneal_learning_rate(self, epoch):
         """
         This function linearly decays the learning rate
         to a predefined minimum over a set amount of epochs.
         """
-        self.lr -= self.decay_rate
+        self.lr += self.decay_rate
 
         # log to tensorboard
         if self.use_tensorboard:
@@ -352,7 +343,7 @@ class Trainer(object):
         If this model has reached the best validation accuracy thus
         far, a seperate file with the suffix `best` is created.
         """
-        print("[*] Saving model to {}".format(self.ckpt_dir))
+        # print("[*] Saving model to {}".format(self.ckpt_dir))
 
         filename = self.model_name + '_ckpt.pth.tar'
         ckpt_path = os.path.join(self.ckpt_dir, filename)
@@ -363,7 +354,6 @@ class Trainer(object):
             shutil.copyfile(
                 ckpt_path, os.path.join(self.ckpt_dir, filename)
             )
-            print("[!] Best valid acc achieved...")
 
     def load_checkpoint(self, best=False):
         """
@@ -392,7 +382,7 @@ class Trainer(object):
         self.model.load_state_dict(ckpt['state_dict'])
 
         print(
-            "[*] Loaded {} checkpoint @ epoch {} \
-            with best valid acc of {:.3f}".format(
+            "[*] Loaded {} checkpoint @ epoch {} "
+            "with best valid acc of {:.3f}".format(
                 filename, ckpt['epoch'], ckpt['best_valid_acc'])
         )

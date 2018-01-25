@@ -45,7 +45,8 @@ def main():
         imgs.append(torch.from_numpy(img))
     imgs = Variable(torch.cat(imgs))
 
-    loc = Variable(torch.Tensor([[0., 0.], [0., 0.]]))
+    loc = torch.Tensor(2, 2).uniform_(-1, 1)
+    loc = Variable(loc)
 
     if TEST_GLIMPSE:
 

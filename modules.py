@@ -48,8 +48,8 @@ class retina(object):
         whose side is `s` times the size of the previous
         patch.
 
-        The `k` patches are finally resized to (g, g)
-        and concatenated into a 5D tensor of shape (B, k, g, g, C).
+        The `k` patches are finally resized to (g, g) and
+        concatenated into a tensor of shape (B, k, g, g, C).
         """
         phi = []
         size = self.g
@@ -358,7 +358,7 @@ class location_network(nn.Module):
 
     def forward(self, h_t):
         mu = F.tanh(self.fc(h_t))
-        l_t = F.tanh(self.gaussian(mu))
+        l_t = F.tanh(self.gaussian(mu)).detach()
         return mu, l_t
 
 
