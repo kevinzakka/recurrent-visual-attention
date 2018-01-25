@@ -30,7 +30,7 @@ glimpse_arg.add_argument('--glimpse_hidden', type=int, default=128,
 
 # core network params
 core_arg = add_argument_group('Core Network Params')
-core_arg.add_argument('--num_glimpses', type=int, default=6,
+core_arg.add_argument('--num_glimpses', type=int, default=7,
                       help='# of glimpses, i.e. BPTT iterations')
 core_arg.add_argument('--hidden_size', type=int, default=256,
                       help='hidden size of rnn')

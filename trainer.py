@@ -51,8 +51,11 @@ class Trainer(object):
         if config.is_train:
             self.train_loader = data_loader[0]
             self.valid_loader = data_loader[1]
+            self.num_train = len(self.train_loader.sampler.indices)
+            self.num_valid = len(self.valid_loader.sampler.indices)
         else:
             self.test_loader = data_loader
+            self.num_test = len(self.test_loader.dataset)
         self.num_classes = 10
         self.num_channels = 1
 
@@ -67,8 +70,6 @@ class Trainer(object):
         self.lr = self.init_lr
 
         # misc params
-        self.num_train = len(self.train_loader.sampler.indices)
-        self.num_valid = len(self.valid_loader.sampler.indices)
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
@@ -320,6 +321,43 @@ class Trainer(object):
 
         return losses.avg, accs.avg
 
+    def test(self):
+        """
+        Test the model on the held-out test data. 
+        This function should only be called at the very
+        end once the model has finished training.
+        """
+        correct = 0
+
+        # load the best checkpoint
+        self.load_checkpoint(best=True)
+
+        for i, (x, y) in enumerate(self.test_loader):
+            x, y = Variable(x, volatile=True), Variable(y)
+
+            self.batch_size = x.shape[0]
+            h_t, l_t = self.reset()
+
+            # extract the glimpses
+            for t in range(self.num_glimpses - 1):
+
+                # forward pass through model
+                h_t, l_t = self.model(x, l_t, h_t, train=False)
+
+            # last iteration
+            h_t, l_t, log_probas = self.model(
+                x, l_t, h_t, last=True, train=False
+            )
+
+            pred = log_probas.data.max(1, keepdim=True)[1]
+            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
+
+        perc = (100. * correct) / (self.num_test)
+        print(
+            '[*] Test Acc: {}/{} ({:.0f}%)'.format(
+                correct, self.num_test, perc)
+        )
+
     def anneal_learning_rate(self, epoch):
         """
         This function linearly decays the learning rate
@@ -384,5 +422,5 @@ class Trainer(object):
         print(
             "[*] Loaded {} checkpoint @ epoch {} "
             "with best valid acc of {:.3f}".format(
-                filename, ckpt['epoch'], ckpt['best_valid_acc'])
+                filename, ckpt['epoch']+1, ckpt['best_valid_acc'])
         )
