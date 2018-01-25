@@ -3,7 +3,7 @@
 This is a PyTorch implementation of the Recurrent Attention Model (RAM) as described in [Recurrent Models of Visual Attention](https://arxiv.org/abs/1406.6247) by *Volodymyr Mnih, Nicolas Heess, Alex Graves and Koray Kavukcuoglu*.
 
 <p align="center">
- <img src="./plots/example.gif" alt="Drawing">
+ <img src="./plots/example.gif" alt="Drawing", width=50%>
 </p>
 
 ## Todo
