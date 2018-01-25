@@ -201,12 +201,13 @@ class glimpse_network(nn.Module):
         # what-where layer
         self.fc3 = nn.Linear(h_g, h_g+h_l)
 
-    def forward(self, x, l_t_prev):
+    def forward(self, x, l_t_prev, ret=False):
         # B, H, W, C
         x = x.permute(0, 2, 3, 1)
 
         # generate glimpse phi from image x
         phi = self.retina.foveate(x, l_t_prev)
+        glimpse = phi.clone()
 
         # flatten both
         phi = phi.view(phi.size(0), -1)
@@ -222,6 +223,8 @@ class glimpse_network(nn.Module):
         # feed to fc layer
         g_t = F.relu(what + where)
 
+        if ret:
+            return glimpse, g_t
         return g_t
 
 

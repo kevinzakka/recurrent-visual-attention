@@ -2,8 +2,22 @@ import os
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from PIL import Image
+
+
+def denormalize(T, coords):
+    return (0.5 * ((coords + 1.0) * T))
+
+
+def bounding_box(x, y, size, color='w'):
+    x = int(x - (size / 2))
+    y = int(y - (size / 2))
+    rect = patches.Rectangle(
+        (x, y), size, size, linewidth=1, edgecolor=color, fill=False
+    )
+    return rect
 
 
 class AverageMeter(object):

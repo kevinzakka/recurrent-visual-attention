@@ -7,6 +7,7 @@ from torch.optim import SGD
 import os
 import time
 import shutil
+import pickle
 
 from tqdm import tqdm
 from utils import AverageMeter
@@ -78,10 +79,15 @@ class Trainer(object):
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
         self.print_freq = config.print_freq
+        self.plot_freq = config.plot_freq
         self.model_name = 'ram_{}_{}x{}_{}'.format(
             config.num_glimpses, config.patch_size,
             config.patch_size, config.glimpse_scale
         )
+
+        self.plot_dir = './plots/' + self.model_name + '/'
+        if not os.path.exists(self.plot_dir):
+            os.makedirs(self.plot_dir)
 
         # configure tensorboard logging
         if self.use_tensorboard:
@@ -194,16 +200,26 @@ class Trainer(object):
             for i, (x, y) in enumerate(self.train_loader):
                 x, y = Variable(x), Variable(y)
 
+                plot = False
+                if (epoch % self.plot_freq == 0) and (i == 0):
+                    plot = True
+
                 # initialize hidden state vector
                 self.batch_size = x.shape[0]
                 h_t, l_t = self.reset()
 
+                # save images
+                imgs = []
+                imgs.append(x[0:9])
+
                 # extract the glimpses
+                locations = []
                 log_pi = 0.
                 for t in range(self.num_glimpses - 1):
 
                     # forward pass through model
                     h_t, l_t, p = self.model(x, l_t, h_t)
+                    locations.append(l_t[0:9])
 
                     # accumulate log of policy
                     log_pi += p
@@ -213,6 +229,7 @@ class Trainer(object):
                     x, l_t, h_t, last=True
                 )
                 log_pi += p
+                locations.append(l_t[0:9])
 
                 # calculate reward
                 predicted = torch.max(log_probas, 1)[1]
@@ -255,10 +272,18 @@ class Trainer(object):
                 )
                 pbar.update(self.batch_size)
 
-            # log to tensorboard
-            if self.use_tensorboard:
-                log_value('train_loss', losses.avg, epoch)
-                log_value('train_acc', accs.avg, epoch)
+                # dump the glimpses and locs
+                if plot:
+                    imgs = [g.data.numpy().squeeze() for g in imgs]
+                    locations = [l.data.numpy() for l in locations]
+                    pickle.dump(imgs, open(self.plot_dir + "g_{}.p".format(epoch+1), "wb"))
+                    pickle.dump(locations, open(self.plot_dir + "l_{}.p".format(epoch+1), "wb"))
+
+                # log to tensorboard
+                if self.use_tensorboard:
+                    iteration = epoch*len(self.train_loader) + i
+                    log_value('train_loss', losses.avg, iteration)
+                    log_value('train_acc', accs.avg, iteration)
 
             return losses.avg, accs.avg
 
@@ -314,10 +339,11 @@ class Trainer(object):
             losses.update(loss.data[0], x.size()[0])
             accs.update(acc.data[0], x.size()[0])
 
-        # log to tensorboard
-        if self.use_tensorboard:
-            log_value('valid_loss', losses.avg, epoch)
-            log_value('valid_acc', accs.avg, epoch)
+            # log to tensorboard
+            if self.use_tensorboard:
+                iteration = epoch*len(self.valid_loader) + i
+                log_value('valid_loss', losses.avg, iteration)
+                log_value('valid_acc', accs.avg, iteration)
 
         return losses.avg, accs.avg
 
