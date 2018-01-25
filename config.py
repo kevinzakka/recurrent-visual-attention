@@ -76,6 +76,8 @@ train_arg.add_argument('--patience', type=int, default=100,
 
 # other params
 misc_arg = add_argument_group('Misc.')
+misc_arg.add_argument('--best', type=str2bool, default=True,
+                      help='Load best model or most recent for testing')
 misc_arg.add_argument('--random_seed', type=int, default=1,
                       help='Seed to ensure reproducibility')
 misc_arg.add_argument('--data_dir', type=str, default='./data',

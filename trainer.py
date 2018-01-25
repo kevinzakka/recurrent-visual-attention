@@ -71,6 +71,7 @@ class Trainer(object):
         self.lr = self.init_lr
 
         # misc params
+        self.best = config.best
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
@@ -364,7 +365,7 @@ class Trainer(object):
         correct = 0
 
         # load the best checkpoint
-        self.load_checkpoint(best=True)
+        self.load_checkpoint(best=self.best)
 
         for i, (x, y) in enumerate(self.test_loader):
             x, y = Variable(x, volatile=True), Variable(y)
@@ -454,8 +455,14 @@ class Trainer(object):
         self.lr = ckpt['lr']
         self.model.load_state_dict(ckpt['state_dict'])
 
-        print(
-            "[*] Loaded {} checkpoint @ epoch {} "
-            "with best valid acc of {:.3f}".format(
-                filename, ckpt['epoch']+1, ckpt['best_valid_acc'])
-        )
+        if best:
+            print(
+                "[*] Loaded {} checkpoint @ epoch {} "
+                "with best valid acc of {:.3f}".format(
+                    filename, ckpt['epoch']+1, ckpt['best_valid_acc'])
+            )
+        else:
+            print(
+                "[*] Loaded {} checkpoint @ epoch {}".format(
+                    filename, ckpt['epoch']+1)
+            )
