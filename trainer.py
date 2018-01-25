@@ -75,6 +75,7 @@ class Trainer(object):
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
         self.counter = 0
+        self.divby2 = 0
         self.patience = config.patience
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
@@ -173,13 +174,20 @@ class Trainer(object):
             # check for improvement
             if not is_best:
                 self.counter += 1
+                self.divby2 +=1
+            else:
+                self.divby2 = 0
+            if self.divby2 > 12:
+                self.lr /= 2
+                self.divby2 = 0
             if self.counter > self.patience:
                 print("[!] No improvement in a while, stopping training.")
                 return
             self.best_valid_acc = max(valid_acc, self.best_valid_acc)
             self.save_checkpoint(
                 {'epoch': epoch + 1, 'state_dict': self.model.state_dict(),
-                 'best_valid_acc': self.best_valid_acc}, is_best
+                 'best_valid_acc': self.best_valid_acc,
+                 'lr': self.lr}, is_best
             )
 
     def train_one_epoch(self, epoch):
@@ -380,7 +388,7 @@ class Trainer(object):
 
         perc = (100. * correct) / (self.num_test)
         print(
-            '[*] Test Acc: {}/{} ({:.0f}%)'.format(
+            '[*] Test Acc: {}/{} ({:.2f}%)'.format(
                 correct, self.num_test, perc)
         )
 
@@ -443,6 +451,7 @@ class Trainer(object):
         # load variables from checkpoint
         self.start_epoch = ckpt['epoch']
         self.best_valid_acc = ckpt['best_valid_acc']
+        self.lr = ckpt['lr']
         self.model.load_state_dict(ckpt['state_dict'])
 
         print(

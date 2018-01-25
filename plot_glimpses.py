@@ -37,8 +37,8 @@ def main(plot_dir, epoch):
     # denormalize coordinates
     coords = [denormalize(img_shape, l) for l in locations]
 
-    fig, axs = plt.subplots(nrows=1, ncols=num_cols, figsize=(10, 5))
-    fig.set_dpi(100)
+    fig, axs = plt.subplots(nrows=1, ncols=num_cols)
+    # fig.set_dpi(100)
 
     # plot base image
     for j, ax in enumerate(axs.flat):
@@ -63,7 +63,7 @@ def main(plot_dir, epoch):
 
     # animate
     anim = animation.FuncAnimation(
-        fig, updateData, frames=num_anims, interval=800, repeat=True
+        fig, updateData, frames=num_anims, interval=500, repeat=True
     )
 
     # save as mp4

@@ -38,7 +38,7 @@ core_arg.add_argument('--hidden_size', type=int, default=256,
 
 # reinforce params
 reinforce_arg = add_argument_group('Reinforce Params')
-reinforce_arg.add_argument('--std', type=float, default=0.2,
+reinforce_arg.add_argument('--std', type=float, default=0.11,
                            help='gaussian policy standard deviation')
 
 
@@ -46,7 +46,7 @@ reinforce_arg.add_argument('--std', type=float, default=0.2,
 data_arg = add_argument_group('Data Params')
 data_arg.add_argument('--valid_size', type=float, default=0.1,
                       help='Proportion of training set used for validation')
-data_arg.add_argument('--batch_size', type=int, default=100,
+data_arg.add_argument('--batch_size', type=int, default=20,
                       help='# of images in each batch of data')
 data_arg.add_argument('--num_workers', type=int, default=4,
                       help='# of subprocesses to use for data loading')
@@ -62,13 +62,13 @@ train_arg.add_argument('--is_train', type=str2bool, default=True,
                        help='Whether to train or test the model')
 train_arg.add_argument('--momentum', type=float, default=0.5,
                        help='Nesterov momentum value')
-train_arg.add_argument('--epochs', type=int, default=800,
+train_arg.add_argument('--epochs', type=int, default=2000,
                        help='# of epochs to train for')
 train_arg.add_argument('--init_lr', type=float, default=0.01,
                        help='Initial learning rate value')
-train_arg.add_argument('--min_lr', type=float, default=0.000001,
+train_arg.add_argument('--min_lr', type=float, default=0.00001,
                        help='Min learning rate value')
-train_arg.add_argument('--saturate_epoch', type=int, default=750,
+train_arg.add_argument('--saturate_epoch', type=int, default=800,
                        help='Epoch at which decayed lr will reach min_lr')
 train_arg.add_argument('--patience', type=int, default=100,
                        help='Max # of epochs to wait for no validation improv')
