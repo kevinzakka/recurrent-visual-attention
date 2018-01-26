@@ -16,6 +16,7 @@ def parse_arguments():
     args = vars(arg.parse_args())
     return args['plot_dir'], args['epoch']
 
+
 def main(plot_dir, epoch):
 
     # read in pickle files

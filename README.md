@@ -6,7 +6,7 @@ This is a PyTorch implementation of the Recurrent Attention Model (RAM) as descr
  <img src="./plots/bbox.png" alt="Drawing", width=60%>
 </p>
 <p align="center">
- <img src="./plots/glimpses.png" alt="Drawing", width=60%>
+ <img src="./plots/glimpses.png" alt="Drawing", width=40%>
 </p>
 
 ## Results
@@ -34,7 +34,7 @@ Here's an animation showing the glimpses extracted by the network on a random ba
 
 ## Todo
 
-- [ ] GPU support
+- [x] GPU support
 - [ ] restrict initial random glimpse
 - [ ] make the patch extraction code more efficient
 - [x] animate glimpses for a given iteration and save

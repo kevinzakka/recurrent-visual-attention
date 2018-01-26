@@ -71,6 +71,7 @@ class Trainer(object):
         self.lr = self.init_lr
 
         # misc params
+        self.use_gpu = config.use_gpu
         self.best = config.best
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
@@ -105,6 +106,8 @@ class Trainer(object):
             self.num_channels, self.loc_hidden, self.glimpse_hidden,
             self.std, self.hidden_size, self.num_classes,
         )
+        if self.use_gpu:
+            self.model.cuda()
 
         print('[*] Number of model parameters: {:,}'.format(
             sum([p.data.nelement() for p in self.model.parameters()])))
@@ -175,10 +178,10 @@ class Trainer(object):
             # check for improvement
             if not is_best:
                 self.counter += 1
-                self.divby2 +=1
+                self.divby2 += 1
             else:
                 self.divby2 = 0
-            if self.divby2 > 12:
+            if self.divby2 > 8:
                 self.lr /= 2
                 self.divby2 = 0
             if self.counter > self.patience:
@@ -207,6 +210,8 @@ class Trainer(object):
         tic = time.time()
         with tqdm(total=self.num_train) as pbar:
             for i, (x, y) in enumerate(self.train_loader):
+                if self.use_gpu:
+                    x, y = x.cuda(), y.cuda()
                 x, y = Variable(x), Variable(y)
 
                 plot = False
@@ -285,8 +290,18 @@ class Trainer(object):
                 if plot:
                     imgs = [g.data.numpy().squeeze() for g in imgs]
                     locations = [l.data.numpy() for l in locations]
-                    pickle.dump(imgs, open(self.plot_dir + "g_{}.p".format(epoch+1), "wb"))
-                    pickle.dump(locations, open(self.plot_dir + "l_{}.p".format(epoch+1), "wb"))
+                    pickle.dump(
+                        imgs, open(
+                            self.plot_dir + "g_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
+                    pickle.dump(
+                        locations, open(
+                            self.plot_dir + "l_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
 
                 # log to tensorboard
                 if self.use_tensorboard:
@@ -304,6 +319,8 @@ class Trainer(object):
         accs = AverageMeter()
 
         for i, (x, y) in enumerate(self.valid_loader):
+            if self.use_gpu:
+                x, y = x.cuda(), y.cuda()
             x, y = Variable(x), Variable(y)
 
             self.batch_size = x.shape[0]
@@ -358,7 +375,7 @@ class Trainer(object):
 
     def test(self):
         """
-        Test the model on the held-out test data. 
+        Test the model on the held-out test data.
         This function should only be called at the very
         end once the model has finished training.
         """
@@ -368,6 +385,8 @@ class Trainer(object):
         self.load_checkpoint(best=self.best)
 
         for i, (x, y) in enumerate(self.test_loader):
+            if self.use_gpu:
+                x, y = x.cuda(), y.cuda()
             x, y = Variable(x, volatile=True), Variable(y)
 
             self.batch_size = x.shape[0]

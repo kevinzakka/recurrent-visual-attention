@@ -30,7 +30,7 @@ glimpse_arg.add_argument('--glimpse_hidden', type=int, default=128,
 
 # core network params
 core_arg = add_argument_group('Core Network Params')
-core_arg.add_argument('--num_glimpses', type=int, default=7,
+core_arg.add_argument('--num_glimpses', type=int, default=6,
                       help='# of glimpses, i.e. BPTT iterations')
 core_arg.add_argument('--hidden_size', type=int, default=256,
                       help='hidden size of rnn')
@@ -38,15 +38,15 @@ core_arg.add_argument('--hidden_size', type=int, default=256,
 
 # reinforce params
 reinforce_arg = add_argument_group('Reinforce Params')
-reinforce_arg.add_argument('--std', type=float, default=0.11,
+reinforce_arg.add_argument('--std', type=float, default=0.17,
                            help='gaussian policy standard deviation')
 
 
 # data params
 data_arg = add_argument_group('Data Params')
-data_arg.add_argument('--valid_size', type=float, default=0.1,
+data_arg.add_argument('--valid_size', type=float, default=0.08,
                       help='Proportion of training set used for validation')
-data_arg.add_argument('--batch_size', type=int, default=20,
+data_arg.add_argument('--batch_size', type=int, default=100,
                       help='# of images in each batch of data')
 data_arg.add_argument('--num_workers', type=int, default=4,
                       help='# of subprocesses to use for data loading')
@@ -76,6 +76,8 @@ train_arg.add_argument('--patience', type=int, default=100,
 
 # other params
 misc_arg = add_argument_group('Misc.')
+misc_arg.add_argument('--use_gpu', type=str2bool, default=False,
+                      help="Whether to run on the GPU")
 misc_arg.add_argument('--best', type=str2bool, default=True,
                       help='Load best model or most recent for testing')
 misc_arg.add_argument('--random_seed', type=int, default=1,
@@ -92,7 +94,7 @@ misc_arg.add_argument('--resume', type=str2bool, default=False,
                       help='Whether to resume training from checkpoint')
 misc_arg.add_argument('--print_freq', type=int, default=10,
                       help='How frequently to print training details')
-misc_arg.add_argument('--plot_freq', type=int, default=5,
+misc_arg.add_argument('--plot_freq', type=int, default=10,
                       help='How frequently to plot glimpses')
 
 
