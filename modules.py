@@ -205,8 +205,11 @@ class glimpse_network(nn.Module):
         # B, H, W, C
         x = x.permute(0, 2, 3, 1)
 
+        # # prevent gradients from flowing to retina
+        # loc = l_t_prev.detach()
+
         # generate glimpse phi from image x
-        phi = self.retina.foveate(x, l_t_prev)
+        phi = self.retina.foveate(x, loc)
         glimpse = phi.clone()
 
         # flatten both
@@ -361,7 +364,7 @@ class location_network(nn.Module):
 
     def forward(self, h_t):
         mu = F.tanh(self.fc(h_t))
-        l_t = F.tanh(self.gaussian(mu)).detach()
+        l_t = F.tanh(self.gaussian(mu))
         return mu, l_t
 
 

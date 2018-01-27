@@ -44,7 +44,7 @@ reinforce_arg.add_argument('--std', type=float, default=0.17,
 
 # data params
 data_arg = add_argument_group('Data Params')
-data_arg.add_argument('--valid_size', type=float, default=0.08,
+data_arg.add_argument('--valid_size', type=float, default=0.15,
                       help='Proportion of training set used for validation')
 data_arg.add_argument('--batch_size', type=int, default=100,
                       help='# of images in each batch of data')

@@ -181,8 +181,8 @@ class Trainer(object):
                 self.divby2 += 1
             else:
                 self.divby2 = 0
-            if self.divby2 > 8:
-                self.lr /= 2
+            if self.divby2 > 15:
+                self.lr /= 1.2
                 self.divby2 = 0
             if self.counter > self.patience:
                 print("[!] No improvement in a while, stopping training.")
@@ -247,14 +247,14 @@ class Trainer(object):
 
                 # calculate reward
                 predicted = torch.max(log_probas, 1)[1]
-                R = (predicted == y).float()
+                R = (predicted.detach() == y).float()
 
                 # compute losses for differentiable modules
                 loss_action = F.nll_loss(log_probas, y)
                 loss_baseline = F.mse_loss(b_t, R)
 
                 # compute reinforce loss
-                adjusted_reward = R - b_t
+                adjusted_reward = R - b_t.detach()
                 log_pi = log_pi / self.num_glimpses
                 loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
@@ -267,6 +267,13 @@ class Trainer(object):
                 # store
                 losses.update(loss.data[0], x.size()[0])
                 accs.update(acc.data[0], x.size()[0])
+
+                # a = list(self.model.sensor.parameters())[0].clone()
+                # self.optimizer.zero_grad()
+                # loss_reinforce.backward()
+                # self.optimizer.step()
+                # b = list(self.model.sensor.parameters())[0].clone()
+                # print("Same: {}".format(torch.equal(a.data, b.data)))
 
                 # compute gradients and update SGD
                 self.optimizer.zero_grad()
@@ -344,14 +351,14 @@ class Trainer(object):
 
             # calculate reward
             predicted = torch.max(log_probas, 1)[1]
-            R = (predicted == y).float()
+            R = (predicted.detach() == y).float()
 
             # compute losses for differentiable modules
             loss_action = F.nll_loss(log_probas, y)
             loss_baseline = F.mse_loss(b_t, R)
 
             # compute reinforce loss
-            adjusted_reward = R - b_t
+            adjusted_reward = R - b_t.detach()
             log_pi = log_pi / self.num_glimpses
             loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
