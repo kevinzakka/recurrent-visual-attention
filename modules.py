@@ -209,7 +209,7 @@ class glimpse_network(nn.Module):
         # loc = l_t_prev.detach()
 
         # generate glimpse phi from image x
-        phi = self.retina.foveate(x, loc)
+        phi = self.retina.foveate(x, l_t_prev)
         glimpse = phi.clone()
 
         # flatten both
