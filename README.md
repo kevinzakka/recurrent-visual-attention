@@ -11,13 +11,13 @@ This is a PyTorch implementation of the Recurrent Attention Model (RAM) as descr
 
 ## Results
 
-After training for 136 epochs, I am able to reach `98.300%` accuracy on the validation set and `98.62%` accuracy on the test set. This is equivalent to `1.38%` test error, compared to `1.29%` reported in the paper. I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error.
+After training for 153 epochs, I am able to reach `98.50%` accuracy on the validation set and `98.77%` accuracy on the test set. This is equivalent to `1.23%` test error, compared to `1.29%` reported in the paper. I haven't done random search on the policy standard deviation to tune it so I expect the test error can be reduced to sub `1%` error.
 
 ```
 [*] Number of model parameters: 209,677
 [*] Loading model from ./ckpt
-[*] Loaded ram_6_8x8_2_model_best.pth.tar checkpoint @ epoch 136 with best valid acc of 98.300
-[*] Test Acc: 9862/10000 (98.62%)
+[*] Loaded ram_6_8x8_2_model_best.pth.tar checkpoint @ epoch 153 with best valid acc of 98.500
+[*] Test Acc: 9877/10000 (98.77%)
 ```
 
 Here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
