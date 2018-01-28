@@ -14,7 +14,7 @@ class RecurrentAttention(nn.Module):
     """
     A Recurrent Model of Visual Attention (RAM) [1].
 
-    RAM is a recurrent neural network which processes
+    RAM is a recurrent neural network that processes
     inputs sequentially, attending to different locations
     within the image one at a time, and incrementally
     combining information from these fixations to build

@@ -151,7 +151,7 @@ class retina(object):
 class glimpse_network(nn.Module):
     """
     A network that combines the "what" and the "where"
-    into a glimpse feature vector g_t.
+    into a glimpse feature vector `g_t`.
 
     - "what": glimpse extracted from the retina.
     - "where": location tuple where glimpse was extracted.
@@ -226,7 +226,7 @@ class glimpse_network(nn.Module):
 
 class core_network(nn.Module):
     """
-    An RNN which maintains an internal state that integrates
+    An RNN that maintains an internal state that integrates
     information extracted from the history of past observations.
     It encodes the agent's knowledge of the environment through
     a state vector `h_t` that gets updated at every time step `t`.

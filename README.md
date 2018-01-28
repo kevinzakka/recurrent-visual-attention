@@ -1,17 +1,43 @@
 # Recurrent Visual Attention
 
-This is a PyTorch implementation of the Recurrent Attention Model (RAM) as described in [Recurrent Models of Visual Attention](https://arxiv.org/abs/1406.6247) by *Volodymyr Mnih, Nicolas Heess, Alex Graves and Koray Kavukcuoglu*.
+This is a **PyTorch** implementation of [Recurrent Models of Visual Attention](https://arxiv.org/abs/1406.6247) by *Volodymyr Mnih, Nicolas Heess, Alex Graves and Koray Kavukcuoglu*.
 
 <p align="center">
  <img src="./plots/bbox.png" alt="Drawing", width=60%>
 </p>
 <p align="center">
- <img src="./plots/glimpses.png" alt="Drawing", width=40%>
+ <img src="./plots/glimpses.png" alt="Drawing", width=23%>
 </p>
+
+The *Recurrent Attention Model* (RAM) is a recurrent neural network that processes inputs sequentially, attending to different locations within the image one at a time, and incrementally combining information from these fixations to build up a dynamic internal representation of the image.
+
+## Model Description
+
+In this paper, the attention problem is modeled as the sequential decision process of a goal-directed agent interacting with a visual environment. The agent is built around a recurrent neural network: at each time step, it processes the sensor data, integrates information over time, and chooses how to act and how to deploy its sensor at the next time step.
+
+<p align="center">
+ <img src="./plots/model.png" alt="Drawing", width=70%>
+</p>
+
+- **glimpse sensor**: a retina that extracts a foveated glimpse `phi` around location `l` from an image `x`. It encodes the region around `l` at a high-resolution but uses a progressively lower resolution for pixels further from `l`, resulting in a compressed representation of the original image `x`.
+- **glimpse network**: a network that combines the "what" (`phi`) and the "where" (`l`) into a glimpse feature vector`g_t`.
+- **core network**: an RNN that maintains an internal state that integrates information extracted from the history of past observations. It encodes the agent's knowledge of the environment through a state vector `h_t` that gets updated at every time step `t`.
+- **location network**: uses the internal state `h_t` of the core network to produce the location coordinates `l_t` for the next time step.
+- **action network**: after a fixed number of time steps, uses the internal state `h_t` of the core network to produce the final output classification `y`.
 
 ## Results
 
-After training for 153 epochs, I am able to reach `98.50%` accuracy on the validation set and `98.77%` accuracy on the test set. This is equivalent to `1.23%` test error, compared to `1.29%` reported in the paper. I haven't done random search on the policy standard deviation to tune it so I expect the test error can be reduced to sub `1%` error.
+I decided to tackle the `28x28` MNIST task with the RAM model containing 6 glimpses, of size `8x8`, with a scale factor of `1`.
+
+<center>
+
+|     Task   | Paper           | Me  |
+| ------------- |:-------------:| -----:|
+| `28x28` MNIST      | 1.29% | 1.23%|
+
+</center>
+
+I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error.
 
 ```
 [*] Number of model parameters: 209,677
@@ -20,16 +46,12 @@ After training for 153 epochs, I am able to reach `98.50%` accuracy on the valid
 [*] Test Acc: 9877/10000 (98.77%)
 ```
 
+I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset.
+
 Here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
 
 <p align="center">
- <img src="./plots/example.gif" alt="Drawing", width=60%>
-</p>
-
-## Model Description
-
-<p align="center">
- <img src="./plots/model.png" alt="Drawing", width=70%>
+ <img src="./plots/example.gif" alt="Drawing", width=70%>
 </p>
 
 ## Requirements
@@ -39,37 +61,26 @@ Here's an animation showing the glimpses extracted by the network on a random ba
 - tensorboard_logger
 - tqdm
 
-## Todo
-
-- [x] GPU support
-- [x] Monte-Carlo sampling for validation and testing
-- [ ] restrict initial random glimpse
-- [ ] make the patch extraction code more efficient
-- [x] animate glimpses for a given iteration and save
-- [x] reproduce results
-
 ## Usage
 
-Here's an example command for training a RAM variant that extracts 6 `8x8` glimpses from an image with tensorboard visualization.
-
-```
-python main.py \
---patch_size=8 \
---num_patches=1 \
---glimpse_scale=2 \
---num_glimpses=6 \
---use_tensorboard=True
-```
-
-Alternatively, just edit the values in `config.py` and run
+The easiest way to start training your RAM variant is to edit the parameters in `config.py` and run the following command:
 
 ```
 python main.py
 ```
 
-to train, with `--resume=True` to reload from the latest checkpoint and
+To resume training, run the following command:
+
+```
+python main.py --resume=True
+```
+
+Finally, to test a checkpoint of your model that has achieved the best validation accuracy, run the following command:
 
 ```
 python main.py --is_train=False
 ```
-to test the checkpoint that has achieved the best validation accuracy.
+
+## References
+
+- [Torch Blog Post on RAM](http://torch.ch/blog/2015/09/21/rmva.html)
