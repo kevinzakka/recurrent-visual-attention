@@ -29,13 +29,9 @@ In this paper, the attention problem is modeled as the sequential decision proce
 
 I decided to tackle the `28x28` MNIST task with the RAM model containing 6 glimpses, of size `8x8`, with a scale factor of `1`.
 
-<center>
-
-|     Task      | Paper         | Me    |
-| ------------- |:-------------:| -----:|
-| `28x28` MNIST |      1.29%    | 1.23% |
-
-</center>
+<p align="center">
+ <img src="./plots/results.png" alt="Drawing", width=30%>
+</p>
 
 I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error. I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset when I get the time.
 
