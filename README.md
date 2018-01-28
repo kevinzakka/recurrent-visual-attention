@@ -11,7 +11,14 @@ This is a PyTorch implementation of the Recurrent Attention Model (RAM) as descr
 
 ## Results
 
-I haven't been able to reproduce the paper results. Specifically, on regular MNIST, I am only able to achieve `92%` accuracy vs the `98%+` reported in the paper. I'm still tweaking the hyperparameters and implementing a restriction on the location vector which should improve results significantly.
+After training for 93 epochs, I am able to reach `98.050%` accuracy on the validation set and `98.28%` accuracy on the test set.
+
+```
+[*] Number of model parameters: 209,677
+[*] Loading model from ./ckpt
+[*] Loaded ram_6_8x8_2_model_best.pth.tar checkpoint @ epoch 93 with best valid acc of 98.050
+[*] Test Acc: 9828/10000 (98.28%)
+```
 
 Here's an animation showing the glimpses extracted by the network on a random batch of the 81'st epoch.
 
@@ -35,10 +42,11 @@ Here's an animation showing the glimpses extracted by the network on a random ba
 ## Todo
 
 - [x] GPU support
+- [x] Monte-Carlo sampling for validation and testing
 - [ ] restrict initial random glimpse
 - [ ] make the patch extraction code more efficient
 - [x] animate glimpses for a given iteration and save
-- [ ] reproduce results
+- [x] reproduce results
 
 ## Usage
 

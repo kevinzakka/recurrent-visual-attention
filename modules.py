@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.autograd import Variable
-from torch.distributions import Normal
 
 import numpy as np
 
@@ -198,19 +197,15 @@ class glimpse_network(nn.Module):
         D_in = 2
         self.fc2 = nn.Linear(D_in, h_l)
 
-        # what-where layer
         self.fc3 = nn.Linear(h_g, h_g+h_l)
+        self.fc4 = nn.Linear(h_l, h_g+h_l)
 
-    def forward(self, x, l_t_prev, ret=False):
+    def forward(self, x, l_t_prev):
         # B, H, W, C
         x = x.permute(0, 2, 3, 1)
 
-        # # prevent gradients from flowing to retina
-        # loc = l_t_prev.detach()
-
         # generate glimpse phi from image x
         phi = self.retina.foveate(x, l_t_prev)
-        glimpse = phi.clone()
 
         # flatten both
         phi = phi.view(phi.size(0), -1)
@@ -221,13 +216,11 @@ class glimpse_network(nn.Module):
         l_out = F.relu(self.fc2(l_t_prev))
 
         what = self.fc3(phi_out)
-        where = self.fc3(l_out)
+        where = self.fc4(l_out)
 
         # feed to fc layer
         g_t = F.relu(what + where)
 
-        if ret:
-            return glimpse, g_t
         return g_t
 
 
@@ -346,25 +339,23 @@ class location_network(nn.Module):
         self.std = std
         self.fc = nn.Linear(input_size, output_size)
 
-    def gaussian(self, mu):
-        B = mu.shape[0]
-
-        # initialize standard normal
-        zeros = torch.zeros(B, 2)
-        ones = torch.ones(B, 2)
-        gauss = Normal(zeros, ones)
-
-        # sample from standard normal
-        x = Variable(gauss.sample())
-
-        # shift to desired mean and std
-        x = mu + self.std*x
-
-        return x
-
     def forward(self, h_t):
+        # compute mean
         mu = F.tanh(self.fc(h_t))
-        l_t = F.tanh(self.gaussian(mu))
+
+        # sample from gaussian parametrized by this mean
+        noise = torch.from_numpy(np.random.normal(
+            scale=self.std, size=mu.shape)
+        )
+        noise = Variable(noise.float())
+        l_t = mu + noise
+
+        # bound between [-1, 1]
+        l_t = F.tanh(l_t)
+
+        # prevent gradient flow
+        l_t = l_t.detach()
+
         return mu, l_t
 
 

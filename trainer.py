@@ -3,6 +3,7 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 from torch.optim import SGD
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import os
 import time
@@ -47,6 +48,7 @@ class Trainer(object):
 
         # reinforce params
         self.std = config.std
+        self.M = config.M
 
         # data params
         if config.is_train:
@@ -77,7 +79,6 @@ class Trainer(object):
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
         self.counter = 0
-        self.divby2 = 0
         self.patience = config.patience
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
@@ -112,10 +113,11 @@ class Trainer(object):
         print('[*] Number of model parameters: {:,}'.format(
             sum([p.data.nelement() for p in self.model.parameters()])))
 
-        # initialize optimizer
+        # initialize optimizer and scheduler
         self.optimizer = SGD(
             self.model.parameters(), lr=self.lr, momentum=self.momentum,
         )
+        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min')
 
     def reset(self):
         """
@@ -151,10 +153,6 @@ class Trainer(object):
 
         for epoch in range(self.start_epoch, self.epochs):
 
-            # decay learning rate
-            if epoch < self.saturate_epoch:
-                self.anneal_learning_rate(epoch)
-
             print(
                 '\nEpoch: {}/{} - LR: {:.6f}'.format(
                     epoch+1, self.epochs, self.lr)
@@ -165,6 +163,12 @@ class Trainer(object):
 
             # evaluate on validation set
             valid_loss, valid_acc = self.validate(epoch)
+
+            self.scheduler.step(valid_loss)
+
+            # # decay learning rate
+            # if epoch < self.saturate_epoch:
+            #     self.anneal_learning_rate(epoch)
 
             is_best = valid_acc > self.best_valid_acc
 
@@ -178,12 +182,6 @@ class Trainer(object):
             # check for improvement
             if not is_best:
                 self.counter += 1
-                self.divby2 += 1
-            else:
-                self.divby2 = 0
-            if self.divby2 > 15:
-                self.lr /= 1.2
-                self.divby2 = 0
             if self.counter > self.patience:
                 print("[!] No improvement in a while, stopping training.")
                 return
@@ -214,55 +212,52 @@ class Trainer(object):
                     x, y = x.cuda(), y.cuda()
                 x, y = Variable(x), Variable(y)
 
-                plot = False
-                if (epoch % self.plot_freq == 0) and (i == 0):
-                    plot = True
-
-                # initialize hidden state vector
+                # initialize location vector and hidden state
                 self.batch_size = x.shape[0]
                 h_t, l_t = self.reset()
 
-                # save images
-                imgs = []
-                imgs.append(x[0:9])
-
                 # extract the glimpses
-                locations = []
-                log_pi = 0.
+                log_pi = []
+                baselines = []
                 for t in range(self.num_glimpses - 1):
 
                     # forward pass through model
-                    h_t, l_t, p = self.model(x, l_t, h_t)
-                    locations.append(l_t[0:9])
+                    h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
-                    # accumulate log of policy
-                    log_pi += p
+                    # store
+                    baselines.append(b_t)
+                    log_pi.append(p)
 
                 # last iteration
-                h_t, l_t, p, b_t, log_probas = self.model(
+                h_t, l_t, b_t, log_probas, p = self.model(
                     x, l_t, h_t, last=True
                 )
-                log_pi += p
-                locations.append(l_t[0:9])
+                log_pi.append(p)
+                baselines.append(b_t)
+
+                # convert list to tensors and reshape
+                baselines = torch.stack(baselines).transpose(1, 0)
+                log_pi = torch.stack(log_pi).transpose(1, 0)
 
                 # calculate reward
                 predicted = torch.max(log_probas, 1)[1]
                 R = (predicted.detach() == y).float()
+                R = R.unsqueeze(1).repeat(1, self.num_glimpses)
 
                 # compute losses for differentiable modules
                 loss_action = F.nll_loss(log_probas, y)
-                loss_baseline = F.mse_loss(b_t, R)
+                loss_baseline = F.mse_loss(baselines, R)
 
                 # compute reinforce loss
-                adjusted_reward = R - b_t.detach()
-                log_pi = log_pi / self.num_glimpses
+                adjusted_reward = R - baselines.detach()
                 loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
                 # sum up into a hybrid loss
                 loss = loss_action + loss_baseline + loss_reinforce
 
                 # compute accuracy
-                acc = 100 * (R.sum() / len(y))
+                correct = (predicted == y).float()
+                acc = 100 * (correct.sum() / len(y))
 
                 # store
                 losses.update(loss.data[0], x.size()[0])
@@ -293,23 +288,6 @@ class Trainer(object):
                 )
                 pbar.update(self.batch_size)
 
-                # dump the glimpses and locs
-                if plot:
-                    imgs = [g.data.numpy().squeeze() for g in imgs]
-                    locations = [l.data.numpy() for l in locations]
-                    pickle.dump(
-                        imgs, open(
-                            self.plot_dir + "g_{}.p".format(epoch+1),
-                            "wb"
-                        )
-                    )
-                    pickle.dump(
-                        locations, open(
-                            self.plot_dir + "l_{}.p".format(epoch+1),
-                            "wb"
-                        )
-                    )
-
                 # log to tensorboard
                 if self.use_tensorboard:
                     iteration = epoch*len(self.train_loader) + i
@@ -330,43 +308,71 @@ class Trainer(object):
                 x, y = x.cuda(), y.cuda()
             x, y = Variable(x), Variable(y)
 
+            # duplicate 10 times
+            x = x.repeat(self.M, 1, 1, 1)
+
+            # initialize location vector and hidden state
             self.batch_size = x.shape[0]
             h_t, l_t = self.reset()
 
             # extract the glimpses
-            log_pi = 0.
+            log_pi = []
+            baselines = []
             for t in range(self.num_glimpses - 1):
 
                 # forward pass through model
-                h_t, l_t, p = self.model(x, l_t, h_t)
+                h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
-                # accumulate log of policy
-                log_pi += p
+                # store
+                baselines.append(b_t)
+                log_pi.append(p)
 
             # last iteration
-            h_t, l_t, p, b_t, log_probas = self.model(
+            h_t, l_t, b_t, log_probas, p = self.model(
                 x, l_t, h_t, last=True
             )
-            log_pi += p
+            log_pi.append(p)
+            baselines.append(b_t)
+
+            # convert list to tensors and reshape
+            baselines = torch.stack(baselines).transpose(1, 0)
+            log_pi = torch.stack(log_pi).transpose(1, 0)
+
+            # average
+            log_probas = log_probas.view(
+                self.M, -1, log_probas.shape[-1]
+            )
+            log_probas = torch.mean(log_probas, dim=0)
+
+            baselines = baselines.contiguous().view(
+                self.M, -1, baselines.shape[-1]
+            )
+            baselines = torch.mean(baselines, dim=0)
+
+            log_pi = log_pi.contiguous().view(
+                self.M, -1, log_pi.shape[-1]
+            )
+            log_pi = torch.mean(log_pi, dim=0)
 
             # calculate reward
             predicted = torch.max(log_probas, 1)[1]
             R = (predicted.detach() == y).float()
+            R = R.unsqueeze(1).repeat(1, self.num_glimpses)
 
             # compute losses for differentiable modules
             loss_action = F.nll_loss(log_probas, y)
-            loss_baseline = F.mse_loss(b_t, R)
+            loss_baseline = F.mse_loss(baselines, R)
 
             # compute reinforce loss
-            adjusted_reward = R - b_t.detach()
-            log_pi = log_pi / self.num_glimpses
+            adjusted_reward = R - baselines.detach()
             loss_reinforce = torch.mean(-log_pi*adjusted_reward)
 
             # sum up into a hybrid loss
             loss = loss_action + loss_baseline + loss_reinforce
 
             # compute accuracy
-            acc = 100 * (R.sum() / len(y))
+            correct = (predicted == y).float()
+            acc = 100 * (correct.sum() / len(y))
 
             # store
             losses.update(loss.data[0], x.size()[0])
@@ -396,6 +402,10 @@ class Trainer(object):
                 x, y = x.cuda(), y.cuda()
             x, y = Variable(x, volatile=True), Variable(y)
 
+            # duplicate 10 times
+            x = x.repeat(self.M, 1, 1, 1)
+
+            # initialize location vector and hidden state
             self.batch_size = x.shape[0]
             h_t, l_t = self.reset()
 
@@ -403,12 +413,17 @@ class Trainer(object):
             for t in range(self.num_glimpses - 1):
 
                 # forward pass through model
-                h_t, l_t = self.model(x, l_t, h_t, train=False)
+                h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
             # last iteration
-            h_t, l_t, log_probas = self.model(
-                x, l_t, h_t, last=True, train=False
+            h_t, l_t, b_t, log_probas, p = self.model(
+                x, l_t, h_t, last=True
             )
+
+            log_probas = log_probas.view(
+                self.M, -1, log_probas.shape[-1]
+            )
+            log_probas = torch.mean(log_probas, dim=0)
 
             pred = log_probas.data.max(1, keepdim=True)[1]
             correct += pred.eq(y.data.view_as(pred)).cpu().sum()
