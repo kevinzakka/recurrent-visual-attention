@@ -11,7 +11,7 @@ This is a PyTorch implementation of the Recurrent Attention Model (RAM) as descr
 
 ## Results
 
-After training for 124 epochs, I am able to reach `98.300%` accuracy on the validation set and `98.62%` accuracy on the test set. This is equivalent to `1.38%` test error compared to `1.29%` reported in the paper.
+After training for 136 epochs, I am able to reach `98.300%` accuracy on the validation set and `98.62%` accuracy on the test set. This is equivalent to `1.38%` test error, compared to `1.29%` reported in the paper. I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error.
 
 ```
 [*] Number of model parameters: 209,677
@@ -20,7 +20,7 @@ After training for 124 epochs, I am able to reach `98.300%` accuracy on the vali
 [*] Test Acc: 9862/10000 (98.62%)
 ```
 
-Here's an animation showing the glimpses extracted by the network on a random batch of the 81'st epoch.
+Here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
 
 <p align="center">
  <img src="./plots/example.gif" alt="Drawing">
@@ -50,14 +50,14 @@ Here's an animation showing the glimpses extracted by the network on a random ba
 
 ## Usage
 
-Here's an example command for training a RAM variant that extracts 7 `8x8` glimpses from an image with tensorboard visualization.
+Here's an example command for training a RAM variant that extracts 6 `8x8` glimpses from an image with tensorboard visualization.
 
 ```
 python main.py \
 --patch_size=8 \
 --num_patches=1 \
 --glimpse_scale=2 \
---num_glimpses=7 \
+--num_glimpses=6 \
 --use_tensorboard=True
 ```
 
