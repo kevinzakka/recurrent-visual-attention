@@ -31,24 +31,15 @@ I decided to tackle the `28x28` MNIST task with the RAM model containing 6 glimp
 
 <center>
 
-|     Task   | Paper           | Me  |
+|     Task      | Paper         | Me    |
 | ------------- |:-------------:| -----:|
-| `28x28` MNIST      | 1.29% | 1.23%|
+| `28x28` MNIST |      1.29%    | 1.23% |
 
 </center>
 
-I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error.
+I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error. I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset when I get the time.
 
-```
-[*] Number of model parameters: 209,677
-[*] Loading model from ./ckpt
-[*] Loaded ram_6_8x8_2_model_best.pth.tar checkpoint @ epoch 153 with best valid acc of 98.500
-[*] Test Acc: 9877/10000 (98.77%)
-```
-
-I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset.
-
-Here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
+Finally, here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
 
 <p align="center">
  <img src="./plots/example.gif" alt="Drawing", width=70%>
