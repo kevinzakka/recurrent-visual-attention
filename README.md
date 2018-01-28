@@ -23,7 +23,7 @@ After training for 153 epochs, I am able to reach `98.50%` accuracy on the valid
 Here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
 
 <p align="center">
- <img src="./plots/example.gif" alt="Drawing">
+ <img src="./plots/example.gif" alt="Drawing", width=60%>
 </p>
 
 ## Model Description
