@@ -212,11 +212,20 @@ class Trainer(object):
                     x, y = x.cuda(), y.cuda()
                 x, y = Variable(x), Variable(y)
 
+                plot = False
+                if (epoch % self.plot_freq == 0) and (i == 0):
+                    plot = True
+
                 # initialize location vector and hidden state
                 self.batch_size = x.shape[0]
                 h_t, l_t = self.reset()
 
+                # save images
+                imgs = []
+                imgs.append(x[0:9])
+
                 # extract the glimpses
+                locs = []
                 log_pi = []
                 baselines = []
                 for t in range(self.num_glimpses - 1):
@@ -225,6 +234,7 @@ class Trainer(object):
                     h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
                     # store
+                    locs.append(l_t[0:9])
                     baselines.append(b_t)
                     log_pi.append(p)
 
@@ -234,6 +244,7 @@ class Trainer(object):
                 )
                 log_pi.append(p)
                 baselines.append(b_t)
+                locs.append(l_t[0:9])
 
                 # convert list to tensors and reshape
                 baselines = torch.stack(baselines).transpose(1, 0)
@@ -287,6 +298,23 @@ class Trainer(object):
                     )
                 )
                 pbar.update(self.batch_size)
+
+                # dump the glimpses and locs
+                if plot:
+                    imgs = [g.data.numpy().squeeze() for g in imgs]
+                    locs = [l.data.numpy() for l in locs]
+                    pickle.dump(
+                        imgs, open(
+                            self.plot_dir + "g_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
+                    pickle.dump(
+                        locs, open(
+                            self.plot_dir + "l_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
 
                 # log to tensorboard
                 if self.use_tensorboard:

@@ -96,7 +96,7 @@ misc_arg.add_argument('--resume', type=str2bool, default=False,
                       help='Whether to resume training from checkpoint')
 misc_arg.add_argument('--print_freq', type=int, default=10,
                       help='How frequently to print training details')
-misc_arg.add_argument('--plot_freq', type=int, default=10,
+misc_arg.add_argument('--plot_freq', type=int, default=1,
                       help='How frequently to plot glimpses')
 
 

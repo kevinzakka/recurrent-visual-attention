@@ -48,10 +48,7 @@ def main(plot_dir, epoch):
         ax.get_yaxis().set_visible(False)
 
     def updateData(i):
-        if i == 0:
-            color = 'r'
-        else:
-            color = 'w'
+        color = 'r'
         co = coords[i]
         for j, ax in enumerate(axs.flat):
             for p in ax.patches:
