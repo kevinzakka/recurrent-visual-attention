@@ -87,11 +87,11 @@ class retina(object):
 
         # denormalize coords of patch center
         coords = self.denormalize(H, l)
-        
+
         # compute top left corner of patch
         patch_x = coords[:, 0] - (size // 2)
         patch_y = coords[:, 1] - (size // 2)
-        
+
         # loop through mini-batch and extract
         patch = []
         for i in range(B):
