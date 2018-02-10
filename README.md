@@ -1,7 +1,5 @@
 # Recurrent Visual Attention
 
-[Bug on GPU to be fixed]
-
 This is a **PyTorch** implementation of [Recurrent Models of Visual Attention](https://arxiv.org/abs/1406.6247) by *Volodymyr Mnih, Nicolas Heess, Alex Graves and Koray Kavukcuoglu*.
 
 <p align="center">

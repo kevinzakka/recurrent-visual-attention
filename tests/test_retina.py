@@ -65,6 +65,7 @@ def main():
         img = img2array(paths[i], desired_size=[512, 512], expand=True)
         imgs.append(torch.from_numpy(img))
     imgs = Variable(torch.cat(imgs))
+    imgs = imgs.permute(0, 3, 1, 2)
 
     # loc = torch.Tensor(2, 2).uniform_(-1, 1)
     loc = torch.from_numpy(np.array([[0., 0.], [0., 0.]]))
@@ -72,6 +73,9 @@ def main():
 
     ret = retina(g=64, k=3, s=2)
     glimpse = ret.foveate(imgs, loc).data.numpy()
+
+    glimpse = np.reshape(glimpse, [2, 3, 3, 64, 64])
+    glimpse = np.transpose(glimpse, [0, 1, 3, 4, 2])
 
     merged = []
     for i in range(len(glimpse)):
@@ -88,7 +92,8 @@ def main():
         axs[i].imshow(merged[i])
         axs[i].get_xaxis().set_visible(False)
         axs[i].get_yaxis().set_visible(False)
-    plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=100, bbox_inches='tight')
+    plt.show()
+    # plt.savefig(plot_dir + 'glimpses.png', format='png', dpi=100, bbox_inches='tight')
 
     # plt.imshow(merged[0])
     # plt.axis('off')

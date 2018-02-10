@@ -6,8 +6,6 @@ from torch.autograd import Variable
 
 import numpy as np
 
-from utils import resize_array
-
 
 class retina(object):
     """
@@ -53,20 +51,19 @@ class retina(object):
         phi = []
         size = self.g
 
-        # extract k patches of decreasing resolution
+        # extract k patches of increasing size
         for i in range(self.k):
             phi.append(self.extract_patch(x, l, size))
             size = int(self.s * size)
 
         # resize the patches to squares of size g
-        phi = [p.numpy() for p in phi]
-        phi = [
-            resize_array(p, self.g) if p.shape[1] != self.g
-            else np.expand_dims(p, 1) for p in phi
-        ]
+        for i in range(1, len(phi)):
+            k = phi[i].shape[-1] // self.g
+            phi[i] = F.avg_pool2d(phi[i], k)
 
-        # concatenate into a single tensor
-        phi = Variable(torch.from_numpy(np.concatenate(phi, 1)))
+        # concatenate into a single tensor and flatten
+        phi = torch.cat(phi, 1)
+        phi = phi.view(phi.shape[0], -1)
 
         return phi
 
@@ -86,44 +83,49 @@ class retina(object):
         -------
         - patch: a 4D Tensor of shape (B, size, size, C)
         """
-        # denormalize coords of patch center
-        coords = self.denormalize(x.shape[1], l)
-        coords = coords.data.numpy()
+        B, C, H, W = x.shape
 
+        # denormalize coords of patch center
+        coords = self.denormalize(H, l)
+        
         # compute top left corner of patch
         patch_x = coords[:, 0] - (size // 2)
         patch_y = coords[:, 1] - (size // 2)
-
-        # loop through minibatch
+        
+        # loop through mini-batch and extract
         patch = []
-        for i in range(len(x)):
-            # grab img
-            p = x[i].unsqueeze(0).data
-            T = p.shape[1]
+        for i in range(B):
+            im = x[i].unsqueeze(dim=0)
+            T = im.shape[-1]
 
             # compute slice indices
             from_x, to_x = patch_x[i], patch_x[i] + size
             from_y, to_y = patch_y[i], patch_y[i] + size
 
-            # pad the img if patch exceeds its bounds
+            # cast to ints
+            from_x, to_x = from_x.data[0], to_x.data[0]
+            from_y, to_y = from_y.data[0], to_y.data[0]
+
+            # pad tensor in case exceeds
             if self.exceeds(from_x, to_x, from_y, to_y, T):
-                pad_dims = [
-                    (0, 0), (size//2+1, size//2+1),
-                    (size//2+1, size//2+1), (0, 0),
-                ]
-                p = p.numpy()
-                p = np.pad(p, pad_dims, mode='constant')
-                p = torch.from_numpy(p)
+                pad_dims = (
+                    size//2+1, size//2+1,
+                    size//2+1, size//2+1,
+                    0, 0,
+                    0, 0,
+                )
+                im = F.pad(im, pad_dims, "constant", 0)
 
                 # add correction factor
                 from_x += (size//2+1)
-                from_y += (size//2+1)
                 to_x += (size//2+1)
+                from_y += (size//2+1)
                 to_y += (size//2+1)
 
-            # extract the patch
-            patch.append(p[:, from_y:to_y, from_x:to_x, :])
+            # and finally extract
+            patch.append(im[:, :, from_y:to_y, from_x:to_x])
 
+        # concatenate into a single tensor
         patch = torch.cat(patch)
 
         return patch
@@ -201,14 +203,10 @@ class glimpse_network(nn.Module):
         self.fc4 = nn.Linear(h_l, h_g+h_l)
 
     def forward(self, x, l_t_prev):
-        # B, H, W, C
-        x = x.permute(0, 2, 3, 1)
-
         # generate glimpse phi from image x
         phi = self.retina.foveate(x, l_t_prev)
 
-        # flatten both
-        phi = phi.view(phi.size(0), -1)
+        # flatten location vector
         l_t_prev = l_t_prev.view(l_t_prev.size(0), -1)
 
         # feed phi and l to respective fc layers
