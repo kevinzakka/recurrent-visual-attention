@@ -44,7 +44,7 @@ Finally, here's an animation showing the glimpses extracted by the network on a 
 ## Requirements
 
 - python 3.5+
-- pytorch 0.2+
+- pytorch 0.3+
 - tensorboard_logger
 - tqdm
 
