@@ -345,7 +345,7 @@ class location_network(nn.Module):
         noise = torch.from_numpy(np.random.normal(
             scale=self.std, size=mu.shape)
         )
-        noise = Variable(noise.float())
+        noise = Variable(noise.float()).type_as(mu)
         l_t = mu + noise
 
         # bound between [-1, 1]

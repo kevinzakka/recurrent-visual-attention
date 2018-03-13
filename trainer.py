@@ -127,11 +127,12 @@ class Trainer(object):
         This is called once every time a new minibatch
         `x` is introduced.
         """
+        dtype = torch.cuda.FloatTensor if self.use_gpu else torch.FloatTensor
         h_t = torch.zeros(self.batch_size, self.hidden_size)
-        h_t = Variable(h_t)
+        h_t = Variable(h_t).type(dtype)
 
         l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-        l_t = Variable(l_t)
+        l_t = Variable(l_t).type(dtype)
 
         return h_t, l_t
 
@@ -301,8 +302,12 @@ class Trainer(object):
 
                 # dump the glimpses and locs
                 if plot:
-                    imgs = [g.data.numpy().squeeze() for g in imgs]
-                    locs = [l.data.numpy() for l in locs]
+                    if self.use_gpu:
+                        imgs = [g.cpu().data.numpy().squeeze() for g in imgs]
+                        locs = [l.cpu().data.numpy() for l in locs]
+                    else:
+                        imgs = [g.data.numpy().squeeze() for g in imgs]
+                        locs = [l.data.numpy() for l in locs]
                     pickle.dump(
                         imgs, open(
                             self.plot_dir + "g_{}.p".format(epoch+1),
