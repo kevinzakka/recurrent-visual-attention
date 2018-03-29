@@ -68,10 +68,6 @@ train_arg.add_argument('--epochs', type=int, default=200,
                        help='# of epochs to train for')
 train_arg.add_argument('--init_lr', type=float, default=0.001,
                        help='Initial learning rate value')
-train_arg.add_argument('--min_lr', type=float, default=0.000001,
-                       help='Min learning rate value')
-train_arg.add_argument('--saturate_epoch', type=int, default=150,
-                       help='Epoch at which decayed lr will reach min_lr')
 train_arg.add_argument('--patience', type=int, default=100,
                        help='Max # of epochs to wait for no validation improv')
 

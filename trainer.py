@@ -65,12 +65,8 @@ class Trainer(object):
         # training params
         self.epochs = config.epochs
         self.start_epoch = 0
-        self.saturate_epoch = config.saturate_epoch
-        self.init_lr = config.init_lr
-        self.min_lr = config.min_lr
-        self.decay_rate = (self.min_lr - self.init_lr) / (self.saturate_epoch)
         self.momentum = config.momentum
-        self.lr = self.init_lr
+        self.lr = config.init_lr
 
         # misc params
         self.use_gpu = config.use_gpu
@@ -117,7 +113,9 @@ class Trainer(object):
         self.optimizer = SGD(
             self.model.parameters(), lr=self.lr, momentum=self.momentum,
         )
-        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min')
+        self.scheduler = ReduceLROnPlateau(
+            self.optimizer, 'min', patience=self.patience
+        )
 
     def reset(self):
         """
@@ -128,6 +126,7 @@ class Trainer(object):
         `x` is introduced.
         """
         dtype = torch.cuda.FloatTensor if self.use_gpu else torch.FloatTensor
+
         h_t = torch.zeros(self.batch_size, self.hidden_size)
         h_t = Variable(h_t).type(dtype)
 
@@ -165,14 +164,10 @@ class Trainer(object):
             # evaluate on validation set
             valid_loss, valid_acc = self.validate(epoch)
 
+            # reduce lr if validation loss plateaus
             self.scheduler.step(valid_loss)
 
-            # # decay learning rate
-            # if epoch < self.saturate_epoch:
-            #     self.anneal_learning_rate(epoch)
-
             is_best = valid_acc > self.best_valid_acc
-
             msg1 = "train loss: {:.3f} - train acc: {:.3f} "
             msg2 = "- val loss: {:.3f} - val acc: {:.3f}"
             if is_best:
@@ -188,9 +183,11 @@ class Trainer(object):
                 return
             self.best_valid_acc = max(valid_acc, self.best_valid_acc)
             self.save_checkpoint(
-                {'epoch': epoch + 1, 'state_dict': self.model.state_dict(),
+                {'epoch': epoch + 1,
+                 'model_state': self.model.state_dict(),
+                 'optim_state': self.optimizer.state_dict(),
                  'best_valid_acc': self.best_valid_acc,
-                 'lr': self.lr}, is_best
+                 }, is_best
             )
 
     def train_one_epoch(self, epoch):
@@ -230,7 +227,6 @@ class Trainer(object):
                 log_pi = []
                 baselines = []
                 for t in range(self.num_glimpses - 1):
-
                     # forward pass through model
                     h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
@@ -274,13 +270,6 @@ class Trainer(object):
                 # store
                 losses.update(loss.data[0], x.size()[0])
                 accs.update(acc.data[0], x.size()[0])
-
-                # a = list(self.model.sensor.parameters())[0].clone()
-                # self.optimizer.zero_grad()
-                # loss_reinforce.backward()
-                # self.optimizer.step()
-                # b = list(self.model.sensor.parameters())[0].clone()
-                # print("Same: {}".format(torch.equal(a.data, b.data)))
 
                 # compute gradients and update SGD
                 self.optimizer.zero_grad()
@@ -352,7 +341,6 @@ class Trainer(object):
             log_pi = []
             baselines = []
             for t in range(self.num_glimpses - 1):
-
                 # forward pass through model
                 h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
@@ -444,7 +432,6 @@ class Trainer(object):
 
             # extract the glimpses
             for t in range(self.num_glimpses - 1):
-
                 # forward pass through model
                 h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
@@ -466,20 +453,6 @@ class Trainer(object):
             '[*] Test Acc: {}/{} ({:.2f}%)'.format(
                 correct, self.num_test, perc)
         )
-
-    def anneal_learning_rate(self, epoch):
-        """
-        This function linearly decays the learning rate
-        to a predefined minimum over a set amount of epochs.
-        """
-        self.lr += self.decay_rate
-
-        # log to tensorboard
-        if self.use_tensorboard:
-            log_value('learning_rate', self.lr, epoch)
-
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = self.lr
 
     def save_checkpoint(self, state, is_best):
         """
@@ -526,8 +499,8 @@ class Trainer(object):
         # load variables from checkpoint
         self.start_epoch = ckpt['epoch']
         self.best_valid_acc = ckpt['best_valid_acc']
-        self.lr = ckpt['lr']
-        self.model.load_state_dict(ckpt['state_dict'])
+        self.model.load_state_dict(ckpt['model_state'])
+        self.optimizer.load_state_dict(ckpt['optim_state'])
 
         if best:
             print(
