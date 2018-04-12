@@ -339,7 +339,7 @@ class location_network(nn.Module):
 
     def forward(self, h_t):
         # compute mean
-        mu = F.tanh(self.fc(h_t))
+        mu = F.tanh(self.fc(h_t.detach()))
 
         # reparametrization trick
         noise = torch.zeros_like(mu)
@@ -377,5 +377,5 @@ class baseline_network(nn.Module):
         self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, h_t):
-        b_t = F.relu(self.fc(h_t))
+        b_t = F.relu(self.fc(h_t.detach()))
         return b_t

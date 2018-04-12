@@ -92,16 +92,20 @@ class RecurrentAttention(nn.Module):
         - l_t: a 2D tensor of shape (B, 2). The location vector
           containing the glimpse coordinates [x, y] for the
           current timestep `t`.
-        - b_t: a 2D vector of shape (B, 1). The baseline for the
+        - b_t: a vector of length (B,). The baseline for the
           current time step `t`.
         - log_probas: a 2D tensor of shape (B, num_classes). The
           output log probability vector over the classes.
+        - log_pi: a vector of length (B,).
         """
         g_t = self.sensor(x, l_t_prev)
         h_t = self.rnn(g_t, h_t_prev)
         mu, l_t = self.locator(h_t)
         b_t = self.baseliner(h_t).squeeze()
 
+        # we assume both dimensions are independent
+        # 1. pdf of the joint is the product of the pdfs
+        # 2. log of the product is the sum of the logs
         log_pi = Normal(mu, self.std).log_prob(l_t)
         log_pi = torch.sum(log_pi, dim=1)
 

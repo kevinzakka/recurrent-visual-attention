@@ -14,7 +14,8 @@ The *Recurrent Attention Model* (RAM) is a recurrent neural network that process
 ## Todo
 
 - [ ] write an efficient version of the retina
-- [ ] try scaling to CIFAR-10
+- [x] reduce training from 130 epochs to 30 epochs
+- [ ] write custom loss and acc plotter
 
 ## Model Description
 
@@ -40,11 +41,13 @@ I decided to tackle the `28x28` MNIST task with the RAM model containing 6 glimp
 
 I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error. I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset when I get the time.
 
-Finally, here's an animation showing the glimpses extracted by the network on a random batch of the 135th epoch.
+Finally, here's an animation showing the glimpses extracted by the network on a random batch of the 23rd epoch.
 
 <p align="center">
  <img src="./plots/example.gif" alt="Drawing", width=70%>
 </p>
+
+With the Adam optimizer, paper accuracy can be reached in 30 epochs.
 
 ## Requirements
 

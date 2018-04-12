@@ -110,12 +110,15 @@ class Trainer(object):
         print('[*] Number of model parameters: {:,}'.format(
             sum([p.data.nelement() for p in self.model.parameters()])))
 
-        # initialize optimizer and scheduler
-        self.optimizer = optim.SGD(
-            self.model.parameters(), lr=self.lr, momentum=self.momentum,
-        )
-        self.scheduler = ReduceLROnPlateau(
-            self.optimizer, 'min', patience=self.lr_patience
+        # # initialize optimizer and scheduler
+        # self.optimizer = optim.SGD(
+        #     self.model.parameters(), lr=self.lr, momentum=self.momentum,
+        # )
+        # self.scheduler = ReduceLROnPlateau(
+        #     self.optimizer, 'min', patience=self.lr_patience
+        # )
+        self.optimizer = optim.Adam(
+            self.model.parameters(), lr=3e-4,
         )
 
     def reset(self):
@@ -126,7 +129,9 @@ class Trainer(object):
         This is called once every time a new minibatch
         `x` is introduced.
         """
-        dtype = torch.cuda.FloatTensor if self.use_gpu else torch.FloatTensor
+        dtype = (
+            torch.cuda.FloatTensor if self.use_gpu else torch.FloatTensor
+        )
 
         h_t = torch.zeros(self.batch_size, self.hidden_size)
         h_t = Variable(h_t).type(dtype)
@@ -454,9 +459,10 @@ class Trainer(object):
             correct += pred.eq(y.data.view_as(pred)).cpu().sum()
 
         perc = (100. * correct) / (self.num_test)
+        error = 100 - perc
         print(
-            '[*] Test Acc: {}/{} ({:.2f}%)'.format(
-                correct, self.num_test, perc)
+            '[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)'.format(
+                correct, self.num_test, perc, error)
         )
 
     def save_checkpoint(self, state, is_best):
@@ -511,10 +517,10 @@ class Trainer(object):
             print(
                 "[*] Loaded {} checkpoint @ epoch {} "
                 "with best valid acc of {:.3f}".format(
-                    filename, ckpt['epoch']+1, ckpt['best_valid_acc'])
+                    filename, ckpt['epoch'], ckpt['best_valid_acc'])
             )
         else:
             print(
                 "[*] Loaded {} checkpoint @ epoch {}".format(
-                    filename, ckpt['epoch']+1)
+                    filename, ckpt['epoch'])
             )
