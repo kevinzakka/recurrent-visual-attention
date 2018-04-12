@@ -341,11 +341,9 @@ class location_network(nn.Module):
         # compute mean
         mu = F.tanh(self.fc(h_t))
 
-        # sample from gaussian parametrized by this mean
-        noise = torch.from_numpy(np.random.normal(
-            scale=self.std, size=mu.shape)
-        )
-        noise = Variable(noise.float()).type_as(mu)
+        # reparametrization trick
+        noise = torch.zeros_like(mu)
+        noise.data.normal_(std=self.std)
         l_t = mu + noise
 
         # bound between [-1, 1]

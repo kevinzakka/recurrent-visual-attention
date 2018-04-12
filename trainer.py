@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from torch.autograd import Variable
-from torch.optim import SGD
+import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import os
@@ -75,7 +75,8 @@ class Trainer(object):
         self.logs_dir = config.logs_dir
         self.best_valid_acc = 0.
         self.counter = 0
-        self.patience = config.patience
+        self.lr_patience = config.lr_patience
+        self.train_patience = config.train_patience
         self.use_tensorboard = config.use_tensorboard
         self.resume = config.resume
         self.print_freq = config.print_freq
@@ -110,11 +111,11 @@ class Trainer(object):
             sum([p.data.nelement() for p in self.model.parameters()])))
 
         # initialize optimizer and scheduler
-        self.optimizer = SGD(
+        self.optimizer = optim.SGD(
             self.model.parameters(), lr=self.lr, momentum=self.momentum,
         )
         self.scheduler = ReduceLROnPlateau(
-            self.optimizer, 'min', patience=self.patience
+            self.optimizer, 'min', patience=self.lr_patience
         )
 
     def reset(self):
@@ -171,6 +172,7 @@ class Trainer(object):
             msg1 = "train loss: {:.3f} - train acc: {:.3f} "
             msg2 = "- val loss: {:.3f} - val acc: {:.3f}"
             if is_best:
+                self.counter = 0
                 msg2 += " [*]"
             msg = msg1 + msg2
             print(msg.format(train_loss, train_acc, valid_loss, valid_acc))
@@ -178,7 +180,7 @@ class Trainer(object):
             # check for improvement
             if not is_best:
                 self.counter += 1
-            if self.counter > self.patience:
+            if self.counter > self.train_patience:
                 print("[!] No improvement in a while, stopping training.")
                 return
             self.best_valid_acc = max(valid_acc, self.best_valid_acc)
@@ -257,8 +259,10 @@ class Trainer(object):
                 loss_baseline = F.mse_loss(baselines, R)
 
                 # compute reinforce loss
+                # summed over timesteps and averaged across batch
                 adjusted_reward = R - baselines.detach()
-                loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+                loss_reinforce = torch.sum(-log_pi*adjusted_reward, dim=1)
+                loss_reinforce = torch.mean(loss_reinforce, dim=0)
 
                 # sum up into a hybrid loss
                 loss = loss_action + loss_baseline + loss_reinforce
@@ -386,7 +390,8 @@ class Trainer(object):
 
             # compute reinforce loss
             adjusted_reward = R - baselines.detach()
-            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+            loss_reinforce = torch.sum(-log_pi*adjusted_reward, dim=1)
+            loss_reinforce = torch.mean(loss_reinforce, dim=0)
 
             # sum up into a hybrid loss
             loss = loss_action + loss_baseline + loss_reinforce

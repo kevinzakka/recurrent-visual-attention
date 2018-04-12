@@ -11,6 +11,11 @@ This is a **PyTorch** implementation of [Recurrent Models of Visual Attention](h
 
 The *Recurrent Attention Model* (RAM) is a recurrent neural network that processes inputs sequentially, attending to different locations within the image one at a time, and incrementally combining information from these fixations to build up a dynamic internal representation of the image.
 
+## Todo
+
+- [ ] write an efficient version of the retina
+- [ ] try scaling to CIFAR-10
+
 ## Model Description
 
 In this paper, the attention problem is modeled as the sequential decision process of a goal-directed agent interacting with a visual environment. The agent is built around a recurrent neural network: at each time step, it processes the sensor data, integrates information over time, and chooses how to act and how to deploy its sensor at the next time step.
