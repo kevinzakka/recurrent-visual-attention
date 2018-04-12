@@ -170,8 +170,8 @@ class Trainer(object):
             # evaluate on validation set
             valid_loss, valid_acc = self.validate(epoch)
 
-            # reduce lr if validation loss plateaus
-            self.scheduler.step(valid_loss)
+            # # reduce lr if validation loss plateaus
+            # self.scheduler.step(valid_loss)
 
             is_best = valid_acc > self.best_valid_acc
             msg1 = "train loss: {:.3f} - train acc: {:.3f} "
@@ -293,7 +293,7 @@ class Trainer(object):
                     (
                         "{:.1f}s - loss: {:.3f} - acc: {:.3f}".format(
                             (toc-tic), loss.data[0], acc.data[0]
-                            )
+                        )
                     )
                 )
                 pbar.update(self.batch_size)

@@ -349,9 +349,6 @@ class location_network(nn.Module):
         # bound between [-1, 1]
         l_t = F.tanh(l_t)
 
-        # prevent gradient flow
-        l_t = l_t.detach()
-
         return mu, l_t
 
 
