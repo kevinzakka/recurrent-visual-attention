@@ -1,9 +1,5 @@
-import math
-
 import torch
 import torch.nn as nn
-
-from torch.distributions import Normal
 
 from modules import baseline_network
 from modules import glimpse_network, core_network
@@ -100,14 +96,12 @@ class RecurrentAttention(nn.Module):
         """
         g_t = self.sensor(x, l_t_prev)
         h_t = self.rnn(g_t, h_t_prev)
-        mu, l_t = self.locator(h_t)
-        b_t = self.baseliner(h_t).squeeze()
 
         # we assume both dimensions are independent
         # 1. pdf of the joint is the product of the pdfs
         # 2. log of the product is the sum of the logs
-        log_pi = Normal(mu, self.std).log_prob(l_t)
-        log_pi = torch.sum(log_pi, dim=1)
+        log_pi, l_t = self.locator(h_t)
+        b_t = self.baseliner(h_t).squeeze()
 
         if last:
             log_probas = self.classifier(h_t)
