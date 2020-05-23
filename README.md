@@ -9,13 +9,7 @@ This is a **PyTorch** implementation of [Recurrent Models of Visual Attention](h
  <img src="./plots/glimpses.png" alt="Drawing", width=23%>
 </p>
 
-The *Recurrent Attention Model* (RAM) is a recurrent neural network that processes inputs sequentially, attending to different locations within the image one at a time, and incrementally combining information from these fixations to build up a dynamic internal representation of the image.
-
-## Todo
-
-- [ ] write an efficient version of the retina
-- [x] reduce training from 130 epochs to 30 epochs
-- [ ] write custom loss and acc plotter
+The *Recurrent Attention Model* (RAM) is a neural network that processes inputs sequentially, attending to different locations within the image one at a time, and incrementally combining information from these fixations to build up a dynamic internal representation of the image.
 
 ## Model Description
 
@@ -26,7 +20,7 @@ In this paper, the attention problem is modeled as the sequential decision proce
 </p>
 
 - **glimpse sensor**: a retina that extracts a foveated glimpse `phi` around location `l` from an image `x`. It encodes the region around `l` at a high-resolution but uses a progressively lower resolution for pixels further from `l`, resulting in a compressed representation of the original image `x`.
-- **glimpse network**: a network that combines the "what" (`phi`) and the "where" (`l`) into a glimpse feature vector`g_t`.
+- **glimpse network**: a network that combines the "what" (`phi`) and the "where" (`l`) into a glimpse feature vector w`g_t`.
 - **core network**: an RNN that maintains an internal state that integrates information extracted from the history of past observations. It encodes the agent's knowledge of the environment through a state vector `h_t` that gets updated at every time step `t`.
 - **location network**: uses the internal state `h_t` of the core network to produce the location coordinates `l_t` for the next time step.
 - **action network**: after a fixed number of time steps, uses the internal state `h_t` of the core network to produce the final output classification `y`.
@@ -35,26 +29,19 @@ In this paper, the attention problem is modeled as the sequential decision proce
 
 I decided to tackle the `28x28` MNIST task with the RAM model containing 6 glimpses, of size `8x8`, with a scale factor of `1`.
 
-<p align="center">
- <img src="./plots/results.png" alt="Drawing", width=30%>
-</p>
+| Model | Validation Error | Test Error |
+|-------|------------------|------------|
+| 6 8x8 | 1.1              | 1.21       |
 
 I haven't done random search on the policy standard deviation to tune it, so I expect the test error can be reduced to sub `1%` error. I'll be updating the table above with results for the `60x60` Translated MNIST, `60x60` Cluttered Translated MNIST and the new Fashion MNIST dataset when I get the time.
 
-Finally, here's an animation showing the glimpses extracted by the network on a random batch of the 23rd epoch.
+Finally, here's an animation showing the glimpses extracted by the network on a random batch at epoch 23.
 
 <p align="center">
  <img src="./plots/example.gif" alt="Drawing", width=70%>
 </p>
 
-With the Adam optimizer, paper accuracy can be reached in 30 epochs.
-
-## Requirements
-
-- python 3.5+
-- pytorch 0.3+
-- tensorboard_logger
-- tqdm
+With the Adam optimizer, paper accuracy can be reached in ~160 epochs.
 
 ## Usage
 
@@ -64,7 +51,7 @@ The easiest way to start training your RAM variant is to edit the parameters in 
 python main.py
 ```
 
-To resume training, run the following command:
+To resume training, run:
 
 ```
 python main.py --resume=True

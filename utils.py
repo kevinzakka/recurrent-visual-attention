@@ -8,10 +8,10 @@ from PIL import Image
 
 
 def denormalize(T, coords):
-    return (0.5 * ((coords + 1.0) * T))
+    return 0.5 * ((coords + 1.0) * T)
 
 
-def bounding_box(x, y, size, color='w'):
+def bounding_box(x, y, size, color="w"):
     x = int(x - (size / 2))
     y = int(y - (size / 2))
     rect = patches.Rectangle(
@@ -20,11 +20,8 @@ def bounding_box(x, y, size, color='w'):
     return rect
 
 
-class AverageMeter(object):
-    """
-    Computes and stores the average and
-    current value.
-    """
+# https://github.com/pytorch/examples/blob/master/imagenet/main.py
+class AverageMeter:
     def __init__(self):
         self.reset()
 
@@ -51,7 +48,7 @@ def resize_array(x, size):
         for i in range(x.shape[0]):
             img = array2img(x[i])
             img = img.resize((size, size))
-            img = np.asarray(img, dtype='float32')
+            img = np.asarray(img, dtype="float32")
             img = np.expand_dims(img, axis=0)
             img /= 255.0
             res.append(img)
@@ -62,7 +59,7 @@ def resize_array(x, size):
     # 3D Tensor
     img = array2img(x)
     img = img.resize((size, size))
-    res = np.asarray(img, dtype='float32')
+    res = np.asarray(img, dtype="float32")
     res = np.expand_dims(res, axis=0)
     res /= 255.0
     return res
@@ -75,12 +72,12 @@ def img2array(data_path, desired_size=None, expand=False, view=False):
     Returns array of shape (1, H, W, C).
     """
     img = Image.open(data_path)
-    img = img.convert('RGB')
+    img = img.convert("RGB")
     if desired_size:
         img = img.resize((desired_size[1], desired_size[0]))
     if view:
         img.show()
-    x = np.asarray(img, dtype='float32')
+    x = np.asarray(img, dtype="float32")
     if expand:
         x = np.expand_dims(x, axis=0)
     x /= 255.0
@@ -99,7 +96,7 @@ def array2img(x):
     if x_max != 0:
         x /= x_max
     x *= 255
-    return Image.fromarray(x.astype('uint8'), 'RGB')
+    return Image.fromarray(x.astype("uint8"), "RGB")
 
 
 def plot_images(images, gd_truth):
@@ -129,15 +126,14 @@ def prepare_dirs(config):
 
 
 def save_config(config):
-    model_name = 'ram_{}_{}x{}_{}'.format(
-        config.num_glimpses, config.patch_size,
-        config.patch_size, config.glimpse_scale
+    model_name = "ram_{}_{}x{}_{}".format(
+        config.num_glimpses, config.patch_size, config.patch_size, config.glimpse_scale
     )
-    filename = model_name + '_params.json'
+    filename = model_name + "_params.json"
     param_path = os.path.join(config.ckpt_dir, filename)
 
     print("[*] Model Checkpoint Dir: {}".format(config.ckpt_dir))
     print("[*] Param Path: {}".format(param_path))
 
-    with open(param_path, 'w') as fp:
+    with open(param_path, "w") as fp:
         json.dump(config.__dict__, fp, indent=4, sort_keys=True)

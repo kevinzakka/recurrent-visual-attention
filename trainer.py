@@ -1,39 +1,40 @@
-import torch
-import torch.nn.functional as F
-
-from torch.autograd import Variable
-import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-
 import os
 import time
 import shutil
 import pickle
 
+import torch
+import torch.nn.functional as F
+
 from tqdm import tqdm
-from utils import AverageMeter
-from model import RecurrentAttention
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboard_logger import configure, log_value
 
+from model import RecurrentAttention
+from utils import AverageMeter
 
-class Trainer(object):
-    """
-    Trainer encapsulates all the logic necessary for
-    training the Recurrent Attention Model.
+
+class Trainer:
+    """A Recurrent Attention Model trainer.
 
     All hyperparameters are provided by the user in the
     config file.
     """
+
     def __init__(self, config, data_loader):
         """
         Construct a new Trainer instance.
 
-        Args
-        ----
-        - config: object containing command line arguments.
-        - data_loader: data iterator
+        Args:
+            config: object containing command line arguments.
+            data_loader: A data iterator.
         """
         self.config = config
+
+        if config.use_gpu and torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
 
         # glimpse network params
         self.patch_size = config.patch_size
@@ -69,11 +70,10 @@ class Trainer(object):
         self.lr = config.init_lr
 
         # misc params
-        self.use_gpu = config.use_gpu
         self.best = config.best
         self.ckpt_dir = config.ckpt_dir
         self.logs_dir = config.logs_dir
-        self.best_valid_acc = 0.
+        self.best_valid_acc = 0.0
         self.counter = 0
         self.lr_patience = config.lr_patience
         self.train_patience = config.train_patience
@@ -81,73 +81,62 @@ class Trainer(object):
         self.resume = config.resume
         self.print_freq = config.print_freq
         self.plot_freq = config.plot_freq
-        self.model_name = 'ram_{}_{}x{}_{}'.format(
-            config.num_glimpses, config.patch_size,
-            config.patch_size, config.glimpse_scale
+        self.model_name = "ram_{}_{}x{}_{}".format(
+            config.num_glimpses,
+            config.patch_size,
+            config.patch_size,
+            config.glimpse_scale,
         )
 
-        self.plot_dir = './plots/' + self.model_name + '/'
+        self.plot_dir = "./plots/" + self.model_name + "/"
         if not os.path.exists(self.plot_dir):
             os.makedirs(self.plot_dir)
 
         # configure tensorboard logging
         if self.use_tensorboard:
             tensorboard_dir = self.logs_dir + self.model_name
-            print('[*] Saving tensorboard logs to {}'.format(tensorboard_dir))
+            print("[*] Saving tensorboard logs to {}".format(tensorboard_dir))
             if not os.path.exists(tensorboard_dir):
                 os.makedirs(tensorboard_dir)
             configure(tensorboard_dir)
 
         # build RAM model
         self.model = RecurrentAttention(
-            self.patch_size, self.num_patches, self.glimpse_scale,
-            self.num_channels, self.loc_hidden, self.glimpse_hidden,
-            self.std, self.hidden_size, self.num_classes,
+            self.patch_size,
+            self.num_patches,
+            self.glimpse_scale,
+            self.num_channels,
+            self.loc_hidden,
+            self.glimpse_hidden,
+            self.std,
+            self.hidden_size,
+            self.num_classes,
         )
-        if self.use_gpu:
-            self.model.cuda()
+        self.model.to(self.device)
 
-        print('[*] Number of model parameters: {:,}'.format(
-            sum([p.data.nelement() for p in self.model.parameters()])))
-
-        # # initialize optimizer and scheduler
-        # self.optimizer = optim.SGD(
-        #     self.model.parameters(), lr=self.lr, momentum=self.momentum,
-        # )
-        # self.scheduler = ReduceLROnPlateau(
-        #     self.optimizer, 'min', patience=self.lr_patience
-        # )
-        self.optimizer = optim.Adam(
+        # initialize optimizer and scheduler
+        self.optimizer = torch.optim.Adam(
             self.model.parameters(), lr=self.config.init_lr
         )
-
         self.scheduler = ReduceLROnPlateau(
-            self.optimizer, 'min', patience=self.lr_patience
+            self.optimizer, "min", patience=self.lr_patience
         )
 
     def reset(self):
-        """
-        Initialize the hidden state of the core network
-        and the location vector.
-
-        This is called once every time a new minibatch
-        `x` is introduced.
-        """
-        dtype = (
-            torch.cuda.FloatTensor if self.use_gpu else torch.FloatTensor
+        h_t = torch.zeros(
+            self.batch_size,
+            self.hidden_size,
+            dtype=torch.float,
+            device=self.device,
+            requires_grad=True,
         )
-
-        h_t = torch.zeros(self.batch_size, self.hidden_size)
-        h_t = Variable(h_t).type(dtype)
-
-        l_t = torch.Tensor(self.batch_size, 2).uniform_(-1, 1)
-        l_t = Variable(l_t).type(dtype)
+        l_t = torch.FloatTensor(self.batch_size, 2).uniform_(-1, 1).to(self.device)
+        l_t.requires_grad = True
 
         return h_t, l_t
 
     def train(self):
-        """
-        Train the model on the training set.
+        """Train the model on the training set.
 
         A checkpoint of the model is saved after each epoch
         and if the validation accuracy is improved upon,
@@ -157,15 +146,18 @@ class Trainer(object):
         if self.resume:
             self.load_checkpoint(best=False)
 
-        print("\n[*] Train on {} samples, validate on {} samples".format(
-            self.num_train, self.num_valid)
+        print(
+            "\n[*] Train on {} samples, validate on {} samples".format(
+                self.num_train, self.num_valid
+            )
         )
 
         for epoch in range(self.start_epoch, self.epochs):
 
             print(
-                '\nEpoch: {}/{} - LR: {:.6f}'.format(
-                    epoch+1, self.epochs, self.optimizer.param_groups[0]['lr'])
+                "\nEpoch: {}/{} - LR: {:.6f}".format(
+                    epoch + 1, self.epochs, self.optimizer.param_groups[0]["lr"]
+                )
             )
 
             # train for 1 epoch
@@ -179,12 +171,16 @@ class Trainer(object):
 
             is_best = valid_acc > self.best_valid_acc
             msg1 = "train loss: {:.3f} - train acc: {:.3f} "
-            msg2 = "- val loss: {:.3f} - val acc: {:.3f}"
+            msg2 = "- val loss: {:.3f} - val acc: {:.3f} - val err: {:.3f}"
             if is_best:
                 self.counter = 0
                 msg2 += " [*]"
             msg = msg1 + msg2
-            print(msg.format(train_loss, train_acc, valid_loss, valid_acc))
+            print(
+                msg.format(
+                    train_loss, train_acc, valid_loss, valid_acc, 100 - valid_acc
+                )
+            )
 
             # check for improvement
             if not is_best:
@@ -194,11 +190,13 @@ class Trainer(object):
                 return
             self.best_valid_acc = max(valid_acc, self.best_valid_acc)
             self.save_checkpoint(
-                {'epoch': epoch + 1,
-                 'model_state': self.model.state_dict(),
-                 'optim_state': self.optimizer.state_dict(),
-                 'best_valid_acc': self.best_valid_acc,
-                 }, is_best
+                {
+                    "epoch": epoch + 1,
+                    "model_state": self.model.state_dict(),
+                    "optim_state": self.optimizer.state_dict(),
+                    "best_valid_acc": self.best_valid_acc,
+                },
+                is_best,
             )
 
     def train_one_epoch(self, epoch):
@@ -220,9 +218,7 @@ class Trainer(object):
             for i, (x, y) in enumerate(self.train_loader):
                 self.optimizer.zero_grad()
 
-                if self.use_gpu:
-                    x, y = x.cuda(), y.cuda()
-                x, y = Variable(x), Variable(y)
+                x, y = x.to(self.device), y.to(self.device)
 
                 plot = False
                 if (epoch % self.plot_freq == 0) and (i == 0):
@@ -250,9 +246,7 @@ class Trainer(object):
                     log_pi.append(p)
 
                 # last iteration
-                h_t, l_t, b_t, log_probas, p = self.model(
-                    x, l_t, h_t, last=True
-                )
+                h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
                 log_pi.append(p)
                 baselines.append(b_t)
                 locs.append(l_t[0:9])
@@ -273,7 +267,7 @@ class Trainer(object):
                 # compute reinforce loss
                 # summed over timesteps and averaged across batch
                 adjusted_reward = R - baselines.detach()
-                loss_reinforce = torch.sum(-log_pi*adjusted_reward, dim=1)
+                loss_reinforce = torch.sum(-log_pi * adjusted_reward, dim=1)
                 loss_reinforce = torch.mean(loss_reinforce, dim=0)
 
                 # sum up into a hybrid loss
@@ -293,12 +287,12 @@ class Trainer(object):
 
                 # measure elapsed time
                 toc = time.time()
-                batch_time.update(toc-tic)
+                batch_time.update(toc - tic)
 
                 pbar.set_description(
                     (
                         "{:.1f}s - loss: {:.3f} - acc: {:.3f}".format(
-                            (toc-tic), loss.item(), acc.item()
+                            (toc - tic), loss.item(), acc.item()
                         )
                     )
                 )
@@ -306,46 +300,34 @@ class Trainer(object):
 
                 # dump the glimpses and locs
                 if plot:
-                    if self.use_gpu:
-                        imgs = [g.cpu().data.numpy().squeeze() for g in imgs]
-                        locs = [l.cpu().data.numpy() for l in locs]
-                    else:
-                        imgs = [g.data.numpy().squeeze() for g in imgs]
-                        locs = [l.data.numpy() for l in locs]
+                    imgs = [g.cpu().data.numpy().squeeze() for g in imgs]
+                    locs = [l.cpu().data.numpy() for l in locs]
                     pickle.dump(
-                        imgs, open(
-                            self.plot_dir + "g_{}.p".format(epoch+1),
-                            "wb"
-                        )
+                        imgs, open(self.plot_dir + "g_{}.p".format(epoch + 1), "wb")
                     )
                     pickle.dump(
-                        locs, open(
-                            self.plot_dir + "l_{}.p".format(epoch+1),
-                            "wb"
-                        )
+                        locs, open(self.plot_dir + "l_{}.p".format(epoch + 1), "wb")
                     )
 
                 # log to tensorboard
                 if self.use_tensorboard:
-                    iteration = epoch*len(self.train_loader) + i
-                    log_value('train_loss', losses.avg, iteration)
-                    log_value('train_acc', accs.avg, iteration)
+                    iteration = epoch * len(self.train_loader) + i
+                    log_value("train_loss", losses.avg, iteration)
+                    log_value("train_acc", accs.avg, iteration)
 
             return losses.avg, accs.avg
 
+    @torch.no_grad()
     def validate(self, epoch):
-        """
-        Evaluate the model on the validation set.
+        """Evaluate the RAM model on the validation set.
         """
         losses = AverageMeter()
         accs = AverageMeter()
 
         for i, (x, y) in enumerate(self.valid_loader):
-            if self.use_gpu:
-                x, y = x.cuda(), y.cuda()
-            x, y = Variable(x), Variable(y)
+            x, y = x.to(self.device), y.to(self.device)
 
-            # duplicate 10 times
+            # duplicate M times
             x = x.repeat(self.M, 1, 1, 1)
 
             # initialize location vector and hidden state
@@ -364,9 +346,7 @@ class Trainer(object):
                 log_pi.append(p)
 
             # last iteration
-            h_t, l_t, b_t, log_probas, p = self.model(
-                x, l_t, h_t, last=True
-            )
+            h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
             log_pi.append(p)
             baselines.append(b_t)
 
@@ -375,19 +355,13 @@ class Trainer(object):
             log_pi = torch.stack(log_pi).transpose(1, 0)
 
             # average
-            log_probas = log_probas.view(
-                self.M, -1, log_probas.shape[-1]
-            )
+            log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
             log_probas = torch.mean(log_probas, dim=0)
 
-            baselines = baselines.contiguous().view(
-                self.M, -1, baselines.shape[-1]
-            )
+            baselines = baselines.contiguous().view(self.M, -1, baselines.shape[-1])
             baselines = torch.mean(baselines, dim=0)
 
-            log_pi = log_pi.contiguous().view(
-                self.M, -1, log_pi.shape[-1]
-            )
+            log_pi = log_pi.contiguous().view(self.M, -1, log_pi.shape[-1])
             log_pi = torch.mean(log_pi, dim=0)
 
             # calculate reward
@@ -401,11 +375,11 @@ class Trainer(object):
 
             # compute reinforce loss
             adjusted_reward = R - baselines.detach()
-            loss_reinforce = torch.sum(-log_pi*adjusted_reward, dim=1)
+            loss_reinforce = torch.sum(-log_pi * adjusted_reward, dim=1)
             loss_reinforce = torch.mean(loss_reinforce, dim=0)
 
             # sum up into a hybrid loss
-            loss = loss_action + loss_baseline + loss_reinforce
+            loss = loss_action + loss_baseline + loss_reinforce * 0.01
 
             # compute accuracy
             correct = (predicted == y).float()
@@ -417,15 +391,16 @@ class Trainer(object):
 
             # log to tensorboard
             if self.use_tensorboard:
-                iteration = epoch*len(self.valid_loader) + i
-                log_value('valid_loss', losses.avg, iteration)
-                log_value('valid_acc', accs.avg, iteration)
+                iteration = epoch * len(self.valid_loader) + i
+                log_value("valid_loss", losses.avg, iteration)
+                log_value("valid_acc", accs.avg, iteration)
 
         return losses.avg, accs.avg
 
+    @torch.no_grad()
     def test(self):
-        """
-        Test the model on the held-out test data.
+        """Test the RAM model.
+
         This function should only be called at the very
         end once the model has finished training.
         """
@@ -435,11 +410,9 @@ class Trainer(object):
         self.load_checkpoint(best=self.best)
 
         for i, (x, y) in enumerate(self.test_loader):
-            if self.use_gpu:
-                x, y = x.cuda(), y.cuda()
-            x, y = Variable(x, volatile=True), Variable(y)
+            x, y = x.to(self.device), y.to(self.device)
 
-            # duplicate 10 times
+            # duplicate M times
             x = x.repeat(self.M, 1, 1, 1)
 
             # initialize location vector and hidden state
@@ -452,81 +425,69 @@ class Trainer(object):
                 h_t, l_t, b_t, p = self.model(x, l_t, h_t)
 
             # last iteration
-            h_t, l_t, b_t, log_probas, p = self.model(
-                x, l_t, h_t, last=True
-            )
+            h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
 
-            log_probas = log_probas.view(
-                self.M, -1, log_probas.shape[-1]
-            )
+            log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
             log_probas = torch.mean(log_probas, dim=0)
 
             pred = log_probas.data.max(1, keepdim=True)[1]
             correct += pred.eq(y.data.view_as(pred)).cpu().sum()
 
-        perc = (100. * correct) / (self.num_test)
+        perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
         print(
-            '[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)'.format(
-                correct, self.num_test, perc, error)
+            "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
+                correct, self.num_test, perc, error
+            )
         )
 
     def save_checkpoint(self, state, is_best):
-        """
-        Save a copy of the model so that it can be loaded at a future
-        date. This function is used when the model is being evaluated
-        on the test data.
+        """Saves a checkpoint of the model.
 
         If this model has reached the best validation accuracy thus
         far, a seperate file with the suffix `best` is created.
         """
-        # print("[*] Saving model to {}".format(self.ckpt_dir))
-
-        filename = self.model_name + '_ckpt.pth.tar'
+        filename = self.model_name + "_ckpt.pth.tar"
         ckpt_path = os.path.join(self.ckpt_dir, filename)
         torch.save(state, ckpt_path)
-
         if is_best:
-            filename = self.model_name + '_model_best.pth.tar'
-            shutil.copyfile(
-                ckpt_path, os.path.join(self.ckpt_dir, filename)
-            )
+            filename = self.model_name + "_model_best.pth.tar"
+            shutil.copyfile(ckpt_path, os.path.join(self.ckpt_dir, filename))
 
     def load_checkpoint(self, best=False):
-        """
-        Load the best copy of a model. This is useful for 2 cases:
+        """Load the best copy of a model.
 
+        This is useful for 2 cases:
         - Resuming training with the most recent model checkpoint.
         - Loading the best validation model to evaluate on the test data.
 
-        Params
-        ------
-        - best: if set to True, loads the best model. Use this if you want
-          to evaluate your model on the test data. Else, set to False in
-          which case the most recent version of the checkpoint is used.
+        Args:
+            best: if set to True, loads the best model.
+                Use this if you want to evaluate your model
+                on the test data. Else, set to False in which
+                case the most recent version of the checkpoint
+                is used.
         """
         print("[*] Loading model from {}".format(self.ckpt_dir))
 
-        filename = self.model_name + '_ckpt.pth.tar'
+        filename = self.model_name + "_ckpt.pth.tar"
         if best:
-            filename = self.model_name + '_model_best.pth.tar'
+            filename = self.model_name + "_model_best.pth.tar"
         ckpt_path = os.path.join(self.ckpt_dir, filename)
         ckpt = torch.load(ckpt_path)
 
         # load variables from checkpoint
-        self.start_epoch = ckpt['epoch']
-        self.best_valid_acc = ckpt['best_valid_acc']
-        self.model.load_state_dict(ckpt['model_state'])
-        self.optimizer.load_state_dict(ckpt['optim_state'])
+        self.start_epoch = ckpt["epoch"]
+        self.best_valid_acc = ckpt["best_valid_acc"]
+        self.model.load_state_dict(ckpt["model_state"])
+        self.optimizer.load_state_dict(ckpt["optim_state"])
 
         if best:
             print(
                 "[*] Loaded {} checkpoint @ epoch {} "
                 "with best valid acc of {:.3f}".format(
-                    filename, ckpt['epoch'], ckpt['best_valid_acc'])
+                    filename, ckpt["epoch"], ckpt["best_valid_acc"]
+                )
             )
         else:
-            print(
-                "[*] Loaded {} checkpoint @ epoch {}".format(
-                    filename, ckpt['epoch'])
-            )
+            print("[*] Loaded {} checkpoint @ epoch {}".format(filename, ckpt["epoch"]))

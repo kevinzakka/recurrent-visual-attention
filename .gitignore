@@ -1,7 +1,6 @@
 *.p
 *.mp4
-data/processed/
-data/raw/
+MNIST/
 logs/
 ckpt/
 .DS_Store

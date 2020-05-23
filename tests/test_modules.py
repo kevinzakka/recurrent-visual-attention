@@ -2,55 +2,43 @@ import sys
 sys.path.append("..")
 
 import torch
-from torch.autograd import Variable
-from torch.distributions import Normal
 
-from utils import img2array
-from modules import baseline_network
-from modules import glimpse_network, core_network
-from modules import action_network, location_network
-
-# params
-plot_dir = '../plots/'
-data_dir = '../data/'
+import modules
+import utils
 
 
-def main():
+if __name__ == "__main__":
+    # paths
+    plot_dir = "../plots/"
+    data_dir = "../data/"
 
     # load images
     imgs = []
-    paths = [data_dir + './lenna.jpg', data_dir + './cat.jpg']
+    paths = [data_dir + "./lenna.jpg", data_dir + "./cat.jpg"]
     for i in range(len(paths)):
-        img = img2array(paths[i], desired_size=[512, 512], expand=True)
+        img = utils.img2array(paths[i], desired_size=[512, 512], expand=True)
         imgs.append(torch.from_numpy(img))
-    imgs = torch.cat(imgs)
+    imgs = torch.cat(imgs).permute((0, 3, 1, 2))
+    B, C, H, W = imgs.shape
 
-    B, H, W, C = imgs.shape
-
-    loc = torch.Tensor([[-1., 1.], [-1., 1.]])
-    imgs, loc = Variable(imgs), Variable(loc)
-    sensor = glimpse_network(h_g=128, h_l=128, g=64, k=3, s=2, c=3)
+    loc = torch.Tensor([[-1.0, 1.0], [-1.0, 1.0]])
+    sensor = modules.GlimpseNetwork(h_g=128, h_l=128, g=64, k=3, s=2, c=3)
     g_t = sensor(imgs, loc)
+    assert g_t.shape == (B, 256)
 
-    rnn = core_network(input_size=256, hidden_size=256)
-    h_t = Variable(torch.zeros(g_t.shape[0], 256))
+    rnn = modules.CoreNetwork(input_size=256, hidden_size=256)
+    h_t = torch.zeros(g_t.shape[0], 256)
     h_t = rnn(g_t, h_t)
+    assert h_t.shape == (B, 256)
 
-    classifier = action_network(256, 10)
+    classifier = modules.ActionNetwork(256, 10)
     a_t = classifier(h_t)
+    assert a_t.shape == (B, 10)
 
-    loc_net = location_network(256, 2, 0.11)
+    loc_net = modules.LocationNetwork(256, 2, 0.11)
     mu, l_t = loc_net(h_t)
+    assert l_t.shape == (B, 2)
 
-    base = baseline_network(256, 1)
+    base = modules.BaselineNetwork(256, 1)
     b_t = base(h_t)
-
-    print("g_t: {}".format(g_t.shape))
-    print("h_t: {}".format(h_t.shape))
-    print("l_t: {}".format(l_t.shape))
-    print("a_t: {}".format(a_t.shape))
-    print("b_t: {}".format(b_t.shape))
-
-
-if __name__ == '__main__':
-    main()
+    assert b_t.shape == (B, 1)
