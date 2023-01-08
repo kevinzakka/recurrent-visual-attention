@@ -81,11 +81,14 @@ class Trainer:
         self.resume = config.resume
         self.print_freq = config.print_freq
         self.plot_freq = config.plot_freq
-        self.model_name = "ram_{}_{}x{}_{}".format(
+        self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}".format(
             config.num_glimpses,
             config.patch_size,
             config.patch_size,
             config.glimpse_scale,
+            config.num_patches,
+            config.num_bits_g_t,
+            config.num_bits_h_t
         )
 
         self.plot_dir = "./plots/" + self.model_name + "/"

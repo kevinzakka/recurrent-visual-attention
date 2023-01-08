@@ -160,6 +160,12 @@ misc_arg.add_argument(
 misc_arg.add_argument(
     "--plot_freq", type=int, default=1, help="How frequently to plot glimpses"
 )
+misc_arg.add_argument(
+    "--num_bits_g_t", type=int, default=0, help="Number of quantized bits for g_t. Zero means not quantized"
+)
+misc_arg.add_argument(
+    "--num_bits_h_t", type=int, default=0, help="Number of quantized bits for h_t. Zero means not quantized"
+)   #TODO those quantizations are not automatic. Must be changed each time. Those configs are only useful for changing the name of the checkpoint files.
 
 
 def get_config():

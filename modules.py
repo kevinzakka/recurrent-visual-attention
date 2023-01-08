@@ -177,10 +177,15 @@ class GlimpseNetwork(nn.Module):
         where = self.fc4(l_out)
 
         # feed to fc layer
-        g_t_not_quantized = F.relu(what + where)  # g_t dimensions: [# of batches, # of elements]
+        g_t = F.relu(what + where)  # g_t dimensions: [# of batches, # of elements]
         
-        bits=2
-        g_t = torch.max(g_t_not_quantized) * torch.round((g_t_not_quantized/torch.max(g_t_not_quantized))*(2**bits - 1)) / (2**bits - 1)
+        # Quantize g_t
+        # bits=2
+        # g_t = torch.round((g_t/torch.max(g_t))*(2**bits - 1))
+
+        # NEXT TWO LINES FOR DEBUGGING
+        # g_t_flattened = (g_t.view(-1))
+        # [ print ( g_t_flattened[i].item() ) for i in range( g_t_flattened.size()[0] ) ]
 
         return g_t
 
