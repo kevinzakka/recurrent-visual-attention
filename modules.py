@@ -18,8 +18,8 @@ class Retina:
     image `x`.
 
     Args:
-        x: a 4D Tensor of shape (B, H, W, C). The minibatch
-            of images.
+        x: a 4D Tensor of shape (B, C, H, W). The minibatch
+            of images. B=batches, C=channels(=1), H=height, W=width
         l: a 2D Tensor of shape (B, 2). Contains normalized
             coordinates in the range [-1, 1].
         g: size of the first square patch.
@@ -47,7 +47,7 @@ class Retina:
         The `k` patches are finally resized to (g, g) and
         concatenated into a tensor of shape (B, k, g, g, C).
         """
-        phi = []
+        phi = []    # phi is a list k batches of patch tensors 
         size = self.g
 
         # extract k patches of increasing size
@@ -62,7 +62,7 @@ class Retina:
 
         # concatenate into a single tensor and flatten
         phi = torch.cat(phi, 1)
-        phi = phi.view(phi.shape[0], -1)
+        phi = phi.view(phi.shape[0], -1)    #phi becomes a tensor of B batches with size*size elements
 
         return phi
 
@@ -87,9 +87,9 @@ class Retina:
         x = F.pad(x, (size // 2, size // 2, size // 2, size // 2))
 
         # loop through mini-batch and extract patches
-        patch = []
+        patch = []  # list of B patch tensors SIXExSIZE pixels
         for i in range(B):
-            patch.append(x[i, :, start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]])
+            patch.append(x[i, :, start[i, 1] : end[i, 1], start[i, 0] : end[i, 0]]) # It takes batch i, all the channels ([:]), and then it takes the height and the width starting from the start pixel to the end pixel. It extracts B batches of patch_size x patch_size pixels in this way
         return torch.stack(patch)
 
     def denormalize(self, T, coords):
@@ -152,7 +152,7 @@ class GlimpseNetwork(nn.Module):
         self.retina = Retina(g, k, s)
 
         # glimpse layer
-        D_in = k * g * g * c
+        D_in = k * g * g * c    # Input dimension of first fc1: it's the one that in the paper corresponds to theta_g_0. This fc just takes as input a vector of patches, hence its dimension is k*g*g (c=1 always). i.e., num_patches*patch_size*patch_size
         self.fc1 = nn.Linear(D_in, h_g)
 
         # location layer
@@ -164,7 +164,7 @@ class GlimpseNetwork(nn.Module):
 
     def forward(self, x, l_t_prev):
         # generate glimpse phi from image x
-        phi = self.retina.foveate(x, l_t_prev)
+        phi = self.retina.foveate(x, l_t_prev)  # phi is the flattened vector of patches. The first dimension is the number of batches, the second one is the number of elements (Channels x patch_size x patch_size). The number of channels in this case corresponds to the number of patches. IT'S NOT THE SAME CHANNELS OF INPUT x. THOSE CHANNELS DON'T MEAN ANYTHING
 
         # flatten location vector
         l_t_prev = l_t_prev.view(l_t_prev.size(0), -1)

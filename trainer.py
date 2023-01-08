@@ -230,7 +230,7 @@ class Trainer:
 
                 # save images
                 imgs = []
-                imgs.append(x[0:9])
+                imgs.append(x[0:9]) # Append the first 10 batches
 
                 # extract the glimpses
                 locs = []
@@ -238,7 +238,7 @@ class Trainer:
                 baselines = []
                 for t in range(self.num_glimpses - 1):
                     # forward pass through model
-                    h_t, l_t, b_t, p = self.model(x, l_t, h_t)
+                    h_t, l_t, b_t, p = self.model(x, l_t, h_t)  # this is the input of a timestamp. It inputs a location, an image and a core h_t. The location is randomly selected between [-1,-1] and [1,1], and the h_t is a size 256 vector initialized to 0. The first dimension is always the batch size.
 
                     # store
                     locs.append(l_t[0:9])
@@ -406,14 +406,26 @@ class Trainer:
         """
         correct = 0
 
+        start_load = time.time()
+
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
 
+        end_load = time.time()
+        print("Load time: ", end_load-start_load)
+
+        start = time.time()
         for i, (x, y) in enumerate(self.test_loader):
             x, y = x.to(self.device), y.to(self.device)
 
+            if i==0:    
+                print(x.size())
+
             # duplicate M times
             x = x.repeat(self.M, 1, 1, 1)
+
+            if i==0:    
+                print(x.shape[0])
 
             # initialize location vector and hidden state
             self.batch_size = x.shape[0]
@@ -435,6 +447,10 @@ class Trainer:
 
         perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
+
+        end = time.time()
+        print("Inference(?) time: ", end-start)
+
         print(
             "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
                 correct, self.num_test, perc, error
@@ -489,5 +505,7 @@ class Trainer:
                     filename, ckpt["epoch"], ckpt["best_valid_acc"]
                 )
             )
+            global start_time
+            start_time = time.time()
         else:
             print("[*] Loaded {} checkpoint @ epoch {}".format(filename, ckpt["epoch"]))

@@ -26,8 +26,8 @@ class RecurrentAttention(nn.Module):
           k: number of patches to extract per glimpse.
           s: scaling factor that controls the size of successive patches.
           c: number of channels in each image.
-          h_g: hidden layer size of the fc layer for `phi`.
-          h_l: hidden layer size of the fc layer for `l`.
+          h_g: hidden layer size of the fc layer for `phi`. (config.loc_hidden)
+          h_l: hidden layer size of the fc layer for `l`. (config.glimpse_hidden)
           std: standard deviation of the Gaussian policy.
           hidden_size: hidden size of the rnn.
           num_classes: number of classes in the dataset.

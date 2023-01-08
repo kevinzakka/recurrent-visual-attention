@@ -41,7 +41,11 @@ def main(config):
         trainer.train()
     # or load a pretrained model and test
     else:
+        import time
+        start_test = time.time()
         trainer.test()
+        end_test = time.time()
+        print("Test time: ", end_test-start_test)
 
 
 if __name__ == "__main__":
