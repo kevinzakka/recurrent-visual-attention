@@ -3,6 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import torch
 
 from PIL import Image
 
@@ -143,3 +144,15 @@ def save_config(config):
 
     with open(param_path, "w") as fp:
         json.dump(config.__dict__, fp, indent=4, sort_keys=True)
+
+def quantize_tensor(t, b):
+    """Quantize a tensor.
+
+    Args:
+        t: tensor
+        b: number of bits available
+
+    Returns:
+        A quantized tensor in integers between [0, 2**b-1].
+    """
+    return torch.round( ( t / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )

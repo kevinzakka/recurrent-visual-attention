@@ -4,6 +4,8 @@ import torch.nn.functional as F
 
 from torch.distributions import Normal
 
+from utils import quantize_tensor
+
 
 class Retina:
     """A visual retina.
@@ -184,8 +186,7 @@ class GlimpseNetwork(nn.Module):
         
         # Quantize g_t
         if self.quant_bits > 0:
-            b = self.quant_bits
-            g_t = torch.round((g_t/torch.max(g_t))*(2**b - 1))
+            g_t = quantize_tensor(g_t, self.quant_bits)
 
         # NEXT TWO LINES FOR DEBUGGING
         # g_t_flattened = (g_t.view(-1))
@@ -244,8 +245,7 @@ class CoreNetwork(nn.Module):
 
         # quantize h_t
         if self.quant_bits > 0:
-            b = self.quant_bits     
-            h_t = torch.round((h_t/torch.max(h_t))*(2**b - 1))
+            h_t = quantize_tensor(h_t, self.quant_bits)
 
         return h_t
 
