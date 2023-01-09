@@ -134,6 +134,7 @@ class GlimpseNetwork(nn.Module):
         k: number of patches to extract per glimpse.
         s: scaling factor that controls the size of successive patches.
         c: number of channels in each image.
+        quant_bits: the number of bits for the quantization
         x: a 4D Tensor of shape (B, H, W, C). The minibatch
             of images.
         l_t_prev: a 2D tensor of shape (B, 2). Contains the glimpse
@@ -146,8 +147,10 @@ class GlimpseNetwork(nn.Module):
             timestep `t`.
     """
 
-    def __init__(self, h_g, h_l, g, k, s, c):
+    def __init__(self, h_g, h_l, g, k, s, c, quant_bits):
         super().__init__()
+
+        self.quant_bits = quant_bits
 
         self.retina = Retina(g, k, s)
 
@@ -180,8 +183,9 @@ class GlimpseNetwork(nn.Module):
         g_t = F.relu(what + where)  # g_t dimensions: [# of batches, # of elements]
         
         # Quantize g_t
-        # bits=2
-        # g_t = torch.round((g_t/torch.max(g_t))*(2**bits - 1))
+        if self.quant_bits > 0:
+            b = self.quant_bits
+            g_t = torch.round((g_t/torch.max(g_t))*(2**b - 1))
 
         # NEXT TWO LINES FOR DEBUGGING
         # g_t_flattened = (g_t.view(-1))
@@ -210,6 +214,7 @@ class CoreNetwork(nn.Module):
     Args:
         input_size: input size of the rnn.
         hidden_size: hidden size of the rnn.
+        quant_bits: the number of bits for the quantization
         g_t: a 2D tensor of shape (B, hidden_size). The glimpse
             representation returned by the glimpse network for the
             current timestep `t`.
@@ -221,8 +226,10 @@ class CoreNetwork(nn.Module):
             state vector for the current timestep `t`.
     """
 
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, quant_bits):
         super().__init__()
+
+        self.quant_bits = quant_bits
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -234,6 +241,12 @@ class CoreNetwork(nn.Module):
         h1 = self.i2h(g_t)
         h2 = self.h2h(h_t_prev)
         h_t = F.relu(h1 + h2)
+
+        # quantize h_t
+        if self.quant_bits > 0:
+            b = self.quant_bits     
+            h_t = torch.round((h_t/torch.max(h_t))*(2**b - 1))
+
         return h_t
 
 

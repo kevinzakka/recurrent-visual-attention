@@ -81,6 +81,8 @@ class Trainer:
         self.resume = config.resume
         self.print_freq = config.print_freq
         self.plot_freq = config.plot_freq
+        self.quant_bits_g_t = config.num_bits_g_t
+        self.quant_bits_h_t = config.num_bits_h_t
         self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}".format(
             config.num_glimpses,
             config.patch_size,
@@ -114,6 +116,8 @@ class Trainer:
             self.std,
             self.hidden_size,
             self.num_classes,
+            self.quant_bits_g_t,
+            self.quant_bits_h_t
         )
         self.model.to(self.device)
 
