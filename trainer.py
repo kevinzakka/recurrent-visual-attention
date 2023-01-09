@@ -409,26 +409,14 @@ class Trainer:
         """
         correct = 0
 
-        start_load = time.time()
-
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
 
-        end_load = time.time()
-        print("Load time: ", end_load-start_load)
-
-        start = time.time()
         for i, (x, y) in enumerate(self.test_loader):
             x, y = x.to(self.device), y.to(self.device)
 
-            if i==0:    
-                print(x.size())
-
             # duplicate M times
             x = x.repeat(self.M, 1, 1, 1)
-
-            if i==0:    
-                print(x.shape[0])
 
             # initialize location vector and hidden state
             self.batch_size = x.shape[0]
@@ -450,9 +438,6 @@ class Trainer:
 
         perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
-
-        end = time.time()
-        print("Inference(?) time: ", end-start)
 
         print(
             "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
@@ -508,7 +493,5 @@ class Trainer:
                     filename, ckpt["epoch"], ckpt["best_valid_acc"]
                 )
             )
-            global start_time
-            start_time = time.time()
         else:
             print("[*] Loaded {} checkpoint @ epoch {}".format(filename, ckpt["epoch"]))
