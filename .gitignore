@@ -109,3 +109,6 @@ ENV/
 
 # VSCode
 .vscode/
+
+# Jupyter
+*.ipynb
