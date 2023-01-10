@@ -112,3 +112,6 @@ ENV/
 
 # Jupyter
 *.ipynb
+
+# Other checkpoints:
+ckpt_*/

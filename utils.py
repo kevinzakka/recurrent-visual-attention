@@ -150,9 +150,9 @@ def quantize_tensor(t, b):
 
     Args:
         t: tensor
-        b: number of bits available
+        b: number of intervals
 
     Returns:
-        A quantized tensor in integers between [0, 2**b-1].
+        A quantized tensor in floating points between [min{t}, max{t}].
     """
-    return torch.round( ( t / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )
+    return (torch.round( ( t / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
