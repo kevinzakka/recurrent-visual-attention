@@ -149,11 +149,12 @@ class GlimpseNetwork(nn.Module):
             timestep `t`.
     """
 
-    def __init__(self, h_g, h_l, g, k, s, c, quant_bits_gt, quant_bits_phi):
+    def __init__(self, h_g, h_l, g, k, s, c, quant_bits_gt, quant_bits_phi, quant_bits_lt):
         super().__init__()
 
         self.quant_bits_gt = quant_bits_gt
         self.quant_bits_phi = quant_bits_phi
+        self.quant_bits_lt = quant_bits_lt
 
         self.retina = Retina(g, k, s)
 
@@ -182,6 +183,10 @@ class GlimpseNetwork(nn.Module):
         # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l_t_prev))
+
+        # Quantize lt
+        if self.quant_bits_lt > 0:
+            l_out = quantize_tensor(l_out, self.quant_bits_lt)
 
         what = self.fc3(phi_out)
         where = self.fc4(l_out)

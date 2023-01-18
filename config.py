@@ -169,6 +169,9 @@ misc_arg.add_argument(
 misc_arg.add_argument(
     "--num_bits_phi", type=int, default=0, help="Number of bits for quantized for phi. Zero or less means not quantized"
 )
+misc_arg.add_argument(
+    "--num_bits_lt", type=int, default=0, help="Number of bits for quantized for phi. Zero or less means not quantized"
+)
 
 
 def get_config():

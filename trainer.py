@@ -84,7 +84,8 @@ class Trainer:
         self.quant_bits_g_t = config.num_bits_g_t
         self.quant_bits_h_t = config.num_bits_h_t
         self.quant_bits_phi = config.num_bits_phi
-        self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}".format(
+        self.quant_bits_lt = config.num_bits_lt
+        self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}_{}".format(
             config.num_glimpses,
             config.patch_size,
             config.patch_size,
@@ -92,7 +93,8 @@ class Trainer:
             config.num_patches,
             config.num_bits_g_t,
             config.num_bits_h_t,
-            config.num_bits_phi
+            config.num_bits_phi,
+            config.num_bits_lt
         )
 
         self.plot_dir = "./plots/" + self.model_name + "/"
@@ -120,7 +122,8 @@ class Trainer:
             self.num_classes,
             self.quant_bits_g_t,
             self.quant_bits_h_t,
-            self.quant_bits_phi
+            self.quant_bits_phi,
+            self.quant_bits_lt
         )
         self.model.to(self.device)
 
