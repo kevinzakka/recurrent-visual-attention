@@ -246,7 +246,7 @@ class CoreNetwork(nn.Module):
     def forward(self, g_t, h_t_prev):
         h1 = self.i2h(g_t)
         h2 = self.h2h(h_t_prev)
-        h_t = F.relu(h1 + h2)
+        h_t = torch.clamp(h1 + h2, min=0.0, max=1.0)
 
         # quantize h_t
         if self.quant_bits > 0:
