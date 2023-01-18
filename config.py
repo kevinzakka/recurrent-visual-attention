@@ -130,7 +130,7 @@ misc_arg.add_argument(
 misc_arg.add_argument(
     "--ckpt_dir",
     type=str,
-    default="./ckpt_paper_formula",
+    default="./ckpt_linear_quantization",
     help="Directory in which to save model checkpoints",
 )
 misc_arg.add_argument(
@@ -161,10 +161,13 @@ misc_arg.add_argument(
     "--plot_freq", type=int, default=1, help="How frequently to plot glimpses"
 )
 misc_arg.add_argument(
-    "--num_bits_g_t", type=int, default=0, help="Number of quantized bits for g_t. Zero or less means not quantized"
+    "--num_bits_g_t", type=int, default=0, help="Number of bits for quantized for g_t. Zero or less means not quantized"
 )
 misc_arg.add_argument(
-    "--num_bits_h_t", type=int, default=0, help="Number of quantized bits for h_t. Zero or less means not quantized"
+    "--num_bits_h_t", type=int, default=0, help="Number of bits for quantized for h_t. Zero or less means not quantized"
+)
+misc_arg.add_argument(
+    "--num_bits_phi", type=int, default=0, help="Number of bits for quantized for phi. Zero or less means not quantized"
 )
 
 

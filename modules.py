@@ -149,10 +149,11 @@ class GlimpseNetwork(nn.Module):
             timestep `t`.
     """
 
-    def __init__(self, h_g, h_l, g, k, s, c, quant_bits):
+    def __init__(self, h_g, h_l, g, k, s, c, quant_bits_gt, quant_bits_phi):
         super().__init__()
 
-        self.quant_bits = quant_bits
+        self.quant_bits_gt = quant_bits_gt
+        self.quant_bits_phi = quant_bits_phi
 
         self.retina = Retina(g, k, s)
 
@@ -174,6 +175,10 @@ class GlimpseNetwork(nn.Module):
         # flatten location vector
         l_t_prev = l_t_prev.view(l_t_prev.size(0), -1)
 
+        # Quantize phi
+        if self.quant_bits_phi > 0:
+            phi = quantize_tensor(phi, self.quant_bits_phi)
+
         # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
         l_out = F.relu(self.fc2(l_t_prev))
@@ -185,8 +190,8 @@ class GlimpseNetwork(nn.Module):
         g_t = F.relu(what + where)  # g_t dimensions: [# of batches, # of elements]
         
         # Quantize g_t
-        if self.quant_bits > 0:
-            g_t = quantize_tensor(g_t, self.quant_bits)
+        if self.quant_bits_gt > 0:
+            g_t = quantize_tensor(g_t, self.quant_bits_gt)
 
         # NEXT TWO LINES FOR DEBUGGING
         # g_t_flattened = (g_t.view(-1))
