@@ -85,17 +85,24 @@ class Trainer:
         self.quant_bits_h_t = config.num_bits_h_t
         self.quant_bits_phi = config.num_bits_phi
         self.quant_bits_lt = config.num_bits_lt
-        self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}_{}".format(
-            config.num_glimpses,
-            config.patch_size,
-            config.patch_size,
-            config.glimpse_scale,
-            config.num_patches,
-            config.num_bits_g_t,
-            config.num_bits_h_t,
-            config.num_bits_phi,
-            config.num_bits_lt
-        )
+        self.load_ckpt = config.load_ckpt
+
+        if config.is_train or self.load_ckpt == "":
+            self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}_{}".format(
+                config.num_glimpses,
+                config.patch_size,
+                config.patch_size,
+                config.glimpse_scale,
+                config.num_patches,
+                config.num_bits_g_t,
+                config.num_bits_h_t,
+                config.num_bits_phi,
+                config.num_bits_lt
+            )
+        else:
+            self.model_name = "ram_{}".format(
+                self.load_ckpt
+            )
 
         self.plot_dir = "./plots/" + self.model_name + "/"
         if not os.path.exists(self.plot_dir):

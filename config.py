@@ -130,8 +130,14 @@ misc_arg.add_argument(
 misc_arg.add_argument(
     "--ckpt_dir",
     type=str,
-    default="./ckpt_clamped",
+    default="./ckpt_linear_quantization",
     help="Directory in which to save model checkpoints",
+)
+misc_arg.add_argument(
+    "--load_ckpt",
+    type=str,
+    default="",
+    help="It loads specific checkpoint no matter which are the parameters.",
 )
 misc_arg.add_argument(
     "--logs_dir",
@@ -157,6 +163,8 @@ misc_arg.add_argument(
     default=10,
     help="How frequently to print training details",
 )
+
+# quantization params
 misc_arg.add_argument(
     "--plot_freq", type=int, default=1, help="How frequently to plot glimpses"
 )
