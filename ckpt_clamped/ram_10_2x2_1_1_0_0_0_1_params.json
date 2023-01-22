@@ -12,7 +12,6 @@
     "is_train": true,
     "loc_hidden": 128,
     "logs_dir": "./logs/",
-    "lr_patience": 20,
     "momentum": 0.5,
     "num_bits_g_t": 0,
     "num_bits_h_t": 0,
