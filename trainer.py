@@ -46,6 +46,7 @@ class Trainer:
         # core network params
         self.num_glimpses = config.num_glimpses
         self.hidden_size = config.hidden_size
+        self.output_size_ht = config.output_size_ht
 
         # reinforce params
         self.std = config.std
@@ -126,6 +127,7 @@ class Trainer:
             self.loc_hidden,
             self.std,
             self.hidden_size,
+            self.output_size_ht,
             self.num_classes,
             self.quant_bits_g_t,
             self.quant_bits_h_t,
@@ -145,7 +147,7 @@ class Trainer:
     def reset(self):
         h_t = torch.zeros(
             self.batch_size,
-            self.hidden_size,
+            self.output_size_ht,
             dtype=torch.float,
             device=self.device,
             requires_grad=True,

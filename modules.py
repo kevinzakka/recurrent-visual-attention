@@ -237,27 +237,33 @@ class CoreNetwork(nn.Module):
             state vector for the current timestep `t`.
     """
 
-    def __init__(self, input_size, hidden_size, quant_bits):
+    def __init__(self, input_size, hidden_size, output_size_ht, quant_bits):
         super().__init__()
 
         self.quant_bits = quant_bits
 
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.output_size_ht = output_size_ht
 
         self.i2h = nn.Linear(input_size, hidden_size)
-        self.h2h = nn.Linear(hidden_size, hidden_size)
+        self.h2h = nn.Linear(output_size_ht, hidden_size)
+
+        self.fc1 = nn.Linear(hidden_size, output_size_ht)
 
     def forward(self, g_t, h_t_prev):
         h1 = self.i2h(g_t)
         h2 = self.h2h(h_t_prev)
+        ht0 = F.relu(h1 + h2)
+
+        ht1 = self.fc1(ht0)
 
         # quantize h_t
         if self.quant_bits > 0:
-            h_t = torch.clamp(h1 + h2, min=0.0, max=1.0)
+            h_t = torch.clamp(ht1, min=0.0, max=1.0)
             h_t = quantize_tensor(h_t, self.quant_bits)
         else:
-            h_t = F.relu(h1 + h2)
+            h_t = F.relu(ht1)
 
         return h_t
 
