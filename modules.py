@@ -160,11 +160,11 @@ class GlimpseNetwork(nn.Module):
 
         # glimpse layer
         D_in = k * g * g * c    # Input dimension of first fc1: it's the one that in the paper corresponds to theta_g_0. This fc just takes as input a vector of patches, hence its dimension is k*g*g (c=1 always). i.e., num_patches*patch_size*patch_size
-        self.fc1 = nn.Linear(D_in, h_g)
+        self.fc1 = nn.Linear(D_in, h_g) # --glimpse_hidden
 
         # location layer
         D_in = 2
-        self.fc2 = nn.Linear(D_in, h_l)
+        self.fc2 = nn.Linear(D_in, h_l) # --loc_hidden
 
         self.fc3 = nn.Linear(h_g, h_g + h_l)
         self.fc4 = nn.Linear(h_l, h_g + h_l)
