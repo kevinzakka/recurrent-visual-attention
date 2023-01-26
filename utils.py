@@ -1,4 +1,4 @@
-import os
+import os, errno
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +9,11 @@ from PIL import Image
 
 
 def denormalize(T, coords):
-    return 0.5 * ((coords + 1.0) * T)
+    """Convert coordinates in the range [-1, 1] to
+    coordinates in the range [0, T] where `T` is
+    the size of the image.
+    """
+    return (0.5 * ((coords + 1.0) * T)).long()
 
 
 def bounding_box(x, y, size, color="w"):
@@ -158,3 +162,10 @@ def quantize_tensor(t, b):
         A quantized tensor in floating points between [min{t}, max{t}].
     """
     return (torch.round( ( t / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
+
+def silent_file_remove(filename):
+    try:
+        os.remove(filename)
+    except OSError as e: # this would be "except OSError, e:" before Python 2.6
+        if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+            raise # re-raise exception if a different error occurred

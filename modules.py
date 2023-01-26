@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from torch.distributions import Normal
 
-from utils import quantize_tensor
+from utils import quantize_tensor, denormalize
 
 
 class Retina:
@@ -82,7 +82,7 @@ class Retina:
         """
         B, C, H, W = x.shape
 
-        start = self.denormalize(H, l)
+        start = denormalize(H, l)  #TODO provare a renderlo simmetrico e vediamo se funziona....
         end = start + size
 
         # pad with zeros
@@ -198,11 +198,7 @@ class GlimpseNetwork(nn.Module):
         if self.quant_bits_gt > 0:
             g_t = quantize_tensor(g_t, self.quant_bits_gt)
 
-        # NEXT TWO LINES FOR DEBUGGING
-        # g_t_flattened = (g_t.view(-1))
-        # [ print ( g_t_flattened[i].item() ) for i in range( g_t_flattened.size()[0] ) ]
-
-        return g_t
+        return g_t, phi
 
 
 class CoreNetwork(nn.Module):

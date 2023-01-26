@@ -2,6 +2,8 @@ import os
 import time
 import shutil
 import pickle
+import numpy as np
+import pandas as pd
 
 import torch
 import torch.nn.functional as F
@@ -11,8 +13,9 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboard_logger import configure, log_value
 
 from model import RecurrentAttention
-from utils import AverageMeter
+from utils import AverageMeter, silent_file_remove
 
+from utils import denormalize
 
 class Trainer:
     """A Recurrent Attention Model trainer.
@@ -260,7 +263,7 @@ class Trainer:
                 baselines = []
                 for t in range(self.num_glimpses - 1):
                     # forward pass through model
-                    h_t, l_t, b_t, p = self.model(x, l_t, h_t)  # this is the input of a timestamp. It inputs a location, an image and a core h_t. The location is randomly selected between [-1,-1] and [1,1], and the h_t is a size 256 vector initialized to 0. The first dimension is always the batch size.
+                    h_t, l_t, b_t, p, phi = self.model(x, l_t, h_t)  # this is the input of a timestamp. It inputs a location, an image and a core h_t. The location is randomly selected between [-1,-1] and [1,1], and the h_t is a size 256 vector initialized to 0. The first dimension is always the batch size.
 
                     # store
                     locs.append(l_t[0:9])
@@ -268,7 +271,7 @@ class Trainer:
                     log_pi.append(p)
 
                 # last iteration
-                h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
+                h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
                 log_pi.append(p)
                 baselines.append(b_t)
                 locs.append(l_t[0:9])
@@ -361,14 +364,14 @@ class Trainer:
             baselines = []
             for t in range(self.num_glimpses - 1):
                 # forward pass through model
-                h_t, l_t, b_t, p = self.model(x, l_t, h_t)
+                h_t, l_t, b_t, p, phi = self.model(x, l_t, h_t)
 
                 # store
                 baselines.append(b_t)
                 log_pi.append(p)
 
             # last iteration
-            h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
+            h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
             log_pi.append(p)
             baselines.append(b_t)
 
@@ -430,6 +433,9 @@ class Trainer:
 
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
+        
+        csv_filename = self.model_name + ".csv"
+        silent_file_remove(os.path.join(self.ckpt_dir, csv_filename))
 
         for i, (x, y) in enumerate(self.test_loader):
             x, y = x.to(self.device), y.to(self.device)
@@ -441,19 +447,38 @@ class Trainer:
             self.batch_size = x.shape[0]
             h_t, l_t = self.reset()
 
+            samples_h0 = h_t.numpy()
+            samples_l0 = denormalize(x.shape[-1], l_t).numpy()
+            numpy_df = np.concatenate((samples_h0, samples_l0), axis=1)
+
             # extract the glimpses
             for t in range(self.num_glimpses - 1):
                 # forward pass through model
-                h_t, l_t, b_t, p = self.model(x, l_t, h_t)
+                h_t, l_t, b_t, p, phi = self.model(x, l_t, h_t)
+
+                samples_phi1 = phi.numpy()
+                samples_h1 = h_t.numpy()
+                samples_l1 = denormalize(x.shape[-1], l_t).numpy()
+                numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1), axis=1)
 
             # last iteration
-            h_t, l_t, b_t, log_probas, p = self.model(x, l_t, h_t, last=True)
+            h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
+
+            samples_phi1 = phi.numpy()
+            samples_h1 = h_t.numpy()
+            samples_l1 = l_t.numpy()
+            numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1), axis=1)
 
             log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
             log_probas = torch.mean(log_probas, dim=0)
 
             pred = log_probas.data.max(1, keepdim=True)[1]
             correct += pred.eq(y.data.view_as(pred)).cpu().sum()
+
+            samples_pred = pred.numpy()
+            numpy_df = np.concatenate((numpy_df, samples_pred), axis=1)
+            pandas_df = pd.DataFrame(numpy_df)
+            pandas_df.to_csv(os.path.join(self.ckpt_dir, csv_filename), mode='a', index=False, header=False)
 
         perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
