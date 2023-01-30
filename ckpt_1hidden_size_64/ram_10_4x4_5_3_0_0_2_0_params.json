@@ -6,7 +6,7 @@
     "data_dir": "./data",
     "epochs": 200,
     "glimpse_hidden": 128,
-    "glimpse_scale": 4,
+    "glimpse_scale": 5,
     "hidden_size": 256,
     "init_lr": 0.0003,
     "is_train": true,
@@ -32,7 +32,7 @@
     "shuffle": true,
     "std": 0.05,
     "train_patience": 50,
-    "use_gpu": false,
+    "use_gpu": true,
     "use_tensorboard": false,
     "valid_size": 0.1
 }
