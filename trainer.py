@@ -17,6 +17,8 @@ from utils import AverageMeter, silent_file_remove
 
 from utils import denormalize
 
+import utils
+
 class Trainer:
     """A Recurrent Attention Model trainer.
 
@@ -223,6 +225,15 @@ class Trainer:
                 },
                 is_best,
             )
+
+        txt_filename = self.model_name + "_phi_max_min.txt"
+        phi_max_string = "phi_max: " + utils.global_phi_max
+        phi_min_string = "phi_min: " + utils.global_phi_min
+        lines = [phi_max_string, phi_min_string]
+        with open(os.path.join(self.ckpt_dir, txt_filename), 'w') as f:
+            for line in lines:
+                f.write(line)
+                f.write('\n')
 
     def train_one_epoch(self, epoch):
         """

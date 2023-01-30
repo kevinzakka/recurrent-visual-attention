@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 from utils import quantize_tensor, denormalize
+import utils
 
 
 class Retina:
@@ -178,6 +179,12 @@ class GlimpseNetwork(nn.Module):
 
         # Quantize phi
         if self.quant_bits_phi > 0:
+            # To save phi max and phi min
+            phi_max = torch.max(phi)
+            phi_min = torch.min(phi)
+            utils.global_phi_max = phi_max if phi_max > utils.global_phi_max else utils.global_phi_max
+            utils.global_phi_min = phi_min if phi_min < utils.global_phi_min else utils.global_phi_min
+
             phi = quantize_tensor(phi, self.quant_bits_phi)
 
         # feed phi and l to respective fc layers
