@@ -178,6 +178,8 @@ class GlimpseNetwork(nn.Module):
 
         # Quantize phi
         if self.quant_bits_phi > 0:
+            # phi = torch.clamp(phi, min=-0.4242, max=2.8215)
+            # phi = quantize_tensor(phi, self.quant_bits_phi, min_t=-0.4242, max_t=2.8215)
             phi = quantize_tensor(phi, self.quant_bits_phi)
 
         # feed phi and l to respective fc layers

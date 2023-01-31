@@ -151,7 +151,7 @@ def save_config(config):
     with open(param_path, "w") as fp:
         json.dump(config.__dict__, fp, indent=4, sort_keys=True)
 
-def quantize_tensor(t, b):
+def quantize_tensor(t, b, min_t = None, max_t = None):
     """Quantize a tensor.
 
     Args:
@@ -161,7 +161,12 @@ def quantize_tensor(t, b):
     Returns:
         A quantized tensor in floating points between [min{t}, max{t}].
     """
-    return (torch.round( ( (t - torch.min(t)) / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
+    if min_t == None:
+        min_t = torch.min(t)
+    if max_t == None:
+        max_t = torch.max(t)
+
+    return (torch.round( ( (t - min_t) / (max_t-min_t) ) * (2**b - 1) )) * (max_t-min_t) / (2**b-1)
 
 global_phi_max = 1.0
 global_phi_min = 0.0
