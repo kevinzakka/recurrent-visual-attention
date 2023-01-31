@@ -179,6 +179,24 @@ class Trainer:
             )
         )
 
+        # SAVED MAXIMUM AND MINIMUM OF PHI
+        whole_dataset = torch.empty((0, 1, 28, 28))
+        for i, (x, y) in enumerate(self.train_loader):
+            whole_dataset =torch.cat((whole_dataset, x.to(self.device)), 0)
+        
+        utils.global_phi_max = torch.max(whole_dataset)
+        utils.global_phi_min = torch.min(whole_dataset)
+
+        txt_filename = self.model_name + "_phi_max_min.txt"
+        phi_max_string = "phi_max: " + str(utils.global_phi_max)
+        phi_min_string = "phi_min: " + str(utils.global_phi_min)
+        lines = [phi_max_string, phi_min_string]
+        with open(os.path.join(self.ckpt_dir, txt_filename), 'w') as f:
+            for line in lines:
+                f.write(line)
+                f.write('\n')
+
+
         for epoch in range(self.start_epoch, self.epochs):
 
             print(
@@ -225,15 +243,6 @@ class Trainer:
                 },
                 is_best,
             )
-
-        txt_filename = self.model_name + "_phi_max_min.txt"
-        phi_max_string = "phi_max: " + utils.global_phi_max
-        phi_min_string = "phi_min: " + utils.global_phi_min
-        lines = [phi_max_string, phi_min_string]
-        with open(os.path.join(self.ckpt_dir, txt_filename), 'w') as f:
-            for line in lines:
-                f.write(line)
-                f.write('\n')
 
     def train_one_epoch(self, epoch):
         """
