@@ -163,6 +163,9 @@ def quantize_tensor(t, b):
     """
     return (torch.round( ( (t - torch.min(t)) / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
 
+global_phi_max = 1.0
+global_phi_min = 0.0
+
 def silent_file_remove(filename):
     try:
         os.remove(filename)
