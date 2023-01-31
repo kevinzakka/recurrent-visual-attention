@@ -182,7 +182,7 @@ class Trainer:
         # SAVED MAXIMUM AND MINIMUM OF PHI
         whole_dataset = torch.empty((0, 1, 28, 28))
         for i, (x, y) in enumerate(self.train_loader):
-            whole_dataset =torch.cat((whole_dataset, x.to(self.device)), 0)
+            whole_dataset =torch.cat((whole_dataset, x), 0)
         
         utils.global_phi_max = torch.max(whole_dataset)
         utils.global_phi_min = torch.min(whole_dataset)
