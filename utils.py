@@ -161,7 +161,7 @@ def quantize_tensor(t, b):
     Returns:
         A quantized tensor in floating points between [min{t}, max{t}].
     """
-    return (torch.round( ( t / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
+    return (torch.round( ( (t - torch.min(t)) / (torch.max(t)-torch.min(t)) ) * (2**b - 1) )) * (torch.max(t)-torch.min(t)) / (2**b-1)
 
 global_phi_max = 1.0
 global_phi_min = 0.0
