@@ -466,7 +466,7 @@ class Trainer:
 
             samples_phi1 = phi.numpy()
             samples_h1 = h_t.numpy()
-            samples_l1 = l_t.numpy()
+            samples_l1 = denormalize(x.shape[-1], l_t).numpy()
             numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1), axis=1)
 
             log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
