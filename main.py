@@ -44,6 +44,7 @@ def main(config):
         import time
         start_test = time.time()
         trainer.test()
+        # trainer.memory_based_inference()
         end_test = time.time()
         print("Test time: ", end_test-start_test)
 

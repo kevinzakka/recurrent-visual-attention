@@ -3,6 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import pandas as pd
 import torch
 
 from PIL import Image
@@ -175,3 +176,36 @@ def silent_file_remove(filename):
     except OSError as e: # this would be "except OSError, e:" before Python 2.6
         if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
             raise # re-raise exception if a different error occurred
+
+def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor) -> np.ndarray:
+    # Load the data from the csv file into a pandas dataframe
+    df = pd.read_csv(csv_file)
+    
+    # Convert the dataframe to a numpy array
+    data = df.to_numpy()
+    
+    # Convert the torch tensors to numpy arrays
+    p_t_np = p_t.detach().numpy()
+    h_t_np = h_t.detach().numpy()
+    l_t_np = l_t.detach().numpy()
+    
+    # Extract the first three vectors for each row into separate arrays
+    h_arr = data[:, :64]
+    l_arr = data[:, 64:66]
+    phi_arr = data[:, 66:114]
+    
+    # Calculate the difference between the target values and the values in each row for each vector
+    p_diff = np.sum((p_t_np[:, np.newaxis, :] - phi_arr[np.newaxis, :, :])**2, axis=-1)
+    h_diff = np.sum((h_t_np[:, np.newaxis, :] - h_arr[np.newaxis, :, :])**2, axis=-1)
+    l_diff = np.sum((l_t_np[:, np.newaxis, :] - l_arr[np.newaxis, :, :])**2, axis=-1)
+    
+    # Calculate the total difference for each row for each vector
+    diff = p_diff + h_diff + l_diff
+    
+    # Find the index of the row with the minimum difference for each vector
+    min_index = np.argmin(diff, axis=-1)
+    
+    # Create a 128x1 matrix with the last column of the closest row
+    closest_last_column = data[min_index, -1]
+    
+    return closest_last_column

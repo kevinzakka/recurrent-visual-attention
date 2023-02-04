@@ -13,7 +13,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboard_logger import configure, log_value
 
 from model import RecurrentAttention
-from utils import AverageMeter, silent_file_remove
+from modules import Retina
+from utils import AverageMeter, closest_result, silent_file_remove
 
 from utils import denormalize
 
@@ -499,6 +500,44 @@ class Trainer:
             numpy_df = np.concatenate((numpy_df, samples_pred), axis=1)
             pandas_df = pd.DataFrame(numpy_df)
             pandas_df.to_csv(os.path.join(self.ckpt_dir, csv_filename), mode='a', index=False, header=False)
+
+        perc = (100.0 * correct) / (self.num_test)
+        error = 100 - perc
+
+        print(
+            "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
+                correct, self.num_test, perc, error
+            )
+        )
+
+    def memory_based_inference(self):
+        """Test the RAM model.
+
+        This function should only be called at the very
+        end once the model has finished training.
+        """
+        correct = 0
+
+        # load the best checkpoint
+        self.load_checkpoint(best=self.best)
+
+        for i, (x, y) in enumerate(self.test_loader):
+            x, y = x.to(self.device), y.to(self.device)
+
+            # duplicate M times
+            x = x.repeat(self.M, 1, 1, 1)
+
+            retina = Retina(self.patch_size, self.num_patches, self.glimpse_scale)
+
+            # initialize location vector and hidden state
+            self.batch_size = x.shape[0]
+            h_t, l_t = self.reset()
+            phi = retina.foveate(x, l_t)
+
+            pred = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
+            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
+
+            print(i)
 
         perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
