@@ -14,7 +14,7 @@ from tensorboard_logger import configure, log_value
 
 from model import RecurrentAttention
 from modules import Retina
-from utils import AverageMeter, closest_result, silent_file_remove
+from utils import AverageMeter, RetinaBasedMemoryInference, closest_result, silent_file_remove
 
 from utils import denormalize
 
@@ -454,6 +454,52 @@ class Trainer:
 
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
+
+        for i, (x, y) in enumerate(self.test_loader):
+            x, y = x.to(self.device), y.to(self.device)
+
+            # duplicate M times
+            x = x.repeat(self.M, 1, 1, 1)
+
+            # initialize location vector and hidden state
+            self.batch_size = x.shape[0]
+            h_t, l_t = self.reset()
+
+            # extract the glimpses
+            for t in range(self.num_glimpses - 1):
+                # forward pass through model
+                h_t, l_t, b_t, p, phi = self.model(x, l_t, h_t)
+
+            # last iteration
+            h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
+
+            log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
+            log_probas = torch.mean(log_probas, dim=0)
+
+            pred = log_probas.data.max(1, keepdim=True)[1]
+            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
+
+        perc = (100.0 * correct) / (self.num_test)
+        error = 100 - perc
+
+        print(
+            "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
+                correct, self.num_test, perc, error
+            )
+        )
+
+    @torch.no_grad()
+    def prepare_training_table(self):
+        """Test the RAM model.
+
+        This function should only be called at the very
+        end once the model has finished training.
+        """
+        correct = 0
+        correct_each_glimpse = 0
+
+        # load the best checkpoint
+        self.load_checkpoint(best=self.best)
         
         csv_filename = self.model_name + ".csv"
         silent_file_remove(os.path.join(self.ckpt_dir, csv_filename))
@@ -468,6 +514,7 @@ class Trainer:
             self.batch_size = x.shape[0]
             h_t, l_t = self.reset()
 
+            # Initialize first numpy_df with first input
             samples_h0 = h_t.numpy()
             samples_l0 = denormalize(x.shape[-1], l_t).numpy()
             numpy_df = np.concatenate((samples_h0, samples_l0), axis=1)
@@ -475,31 +522,48 @@ class Trainer:
             # extract the glimpses
             for t in range(self.num_glimpses - 1):
                 # forward pass through model
-                h_t, l_t, b_t, p, phi = self.model(x, l_t, h_t)
+                h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
 
+                # Prediction for each time-step
+                log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
+                log_probas = torch.mean(log_probas, dim=0)
+                pred = log_probas.data.max(1, keepdim=True)[1]
+
+                # Concatenate inputs, outputs and predictions for each time-step
                 samples_phi1 = phi.numpy()
                 samples_h1 = h_t.numpy()
                 samples_l1 = denormalize(x.shape[-1], l_t).numpy()
-                numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1), axis=1)
+                samples_pred = pred.numpy()
+                numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1, samples_pred), axis=1)
+
+                # Append this time-step to the csv file
+                pandas_df = pd.DataFrame(numpy_df)
+                pandas_df.to_csv(os.path.join(self.ckpt_dir, csv_filename), mode='a', index=False, header=False)
+
+                # Prepare another numpy_df with the new inputs for the next time-step
+                numpy_df = np.concatenate((samples_h1, samples_l1), axis=1)
 
             # last iteration
             h_t, l_t, b_t, log_probas, p, phi = self.model(x, l_t, h_t, last=True)
 
+            # Prediction for the last time-step
+            log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
+            log_probas = torch.mean(log_probas, dim=0)
+            pred = log_probas.data.max(1, keepdim=True)[1]
+
+            # Concatenate last inputs, outputs and predictions
             samples_phi1 = phi.numpy()
             samples_h1 = h_t.numpy()
             samples_l1 = denormalize(x.shape[-1], l_t).numpy()
-            numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1), axis=1)
-
-            log_probas = log_probas.view(self.M, -1, log_probas.shape[-1])
-            log_probas = torch.mean(log_probas, dim=0)
-
-            pred = log_probas.data.max(1, keepdim=True)[1]
-            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
-
             samples_pred = pred.numpy()
-            numpy_df = np.concatenate((numpy_df, samples_pred), axis=1)
+            numpy_df = np.concatenate((numpy_df, samples_phi1, samples_h1, samples_l1, samples_pred), axis=1)
+
+            # Append last time-step to the csv file
             pandas_df = pd.DataFrame(numpy_df)
             pandas_df.to_csv(os.path.join(self.ckpt_dir, csv_filename), mode='a', index=False, header=False)
+
+            # Check if the precision is the same as the normal testing
+            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
 
         perc = (100.0 * correct) / (self.num_test)
         error = 100 - perc
@@ -527,14 +591,25 @@ class Trainer:
             # duplicate M times
             x = x.repeat(self.M, 1, 1, 1)
 
-            retina = Retina(self.patch_size, self.num_patches, self.glimpse_scale)
+            retina = RetinaBasedMemoryInference(self.patch_size, self.num_patches, self.glimpse_scale)
 
             # initialize location vector and hidden state
             self.batch_size = x.shape[0]
             h_t, l_t = self.reset()
+            l_t = denormalize(x.shape[-1], l_t)
             phi = retina.foveate(x, l_t)
+            
+            for t in range(self.num_glimpses - 1):
+                closest_outputs = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
 
-            pred = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
+                h_t = closest_outputs[:, :64]
+                l_t = closest_outputs[:, 64:66].long()
+                phi = retina.foveate(x, l_t)
+
+            closest_outputs = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
+
+            pred = closest_outputs[:, 66]
+            
             correct += pred.eq(y.data.view_as(pred)).cpu().sum()
 
             print(i)

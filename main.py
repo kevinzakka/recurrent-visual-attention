@@ -1,3 +1,4 @@
+import sys
 import torch
 
 import utils
@@ -9,6 +10,10 @@ from config import get_config
 
 def main(config):
     utils.prepare_dirs(config)
+
+    if config.is_train_table and config.mem_based_inference:
+        print("Error: You can't have is_train_table and mem_based_inference both True")
+        sys.exit(1)
 
     # ensure reproducibility
     torch.manual_seed(config.random_seed)
@@ -28,6 +33,10 @@ def main(config):
             config.show_sample,
             **kwargs,
         )
+    elif config.is_train_table:
+        dloader = data_loader.get_train_table_loader(
+            config.data_dir, config.batch_size, **kwargs,
+        )
     else:
         dloader = data_loader.get_test_loader(
             config.data_dir, config.batch_size, **kwargs,
@@ -40,11 +49,14 @@ def main(config):
         utils.save_config(config)
         trainer.train()
     # or load a pretrained model and test
+    elif config.is_train_table:
+        trainer.prepare_training_table()
+    elif config.mem_based_inference:
+        trainer.memory_based_inference()
     else:
         import time
         start_test = time.time()
         trainer.test()
-        # trainer.memory_based_inference()
         end_test = time.time()
         print("Test time: ", end_test-start_test)
 

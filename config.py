@@ -89,6 +89,12 @@ train_arg.add_argument(
     "--is_train", type=str2bool, default=True, help="Whether to train or test the model"
 )
 train_arg.add_argument(
+    "--is_train_table", type=str2bool, default=False, help="Whether to prepare the training table or only test the model"
+)
+train_arg.add_argument(
+    "--mem_based_inference", type=str2bool, default=False, help="Test with memory based inference"
+)
+train_arg.add_argument(
     "--momentum", type=float, default=0.5, help="Nesterov momentum value"
 )
 train_arg.add_argument(

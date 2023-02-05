@@ -119,3 +119,23 @@ def get_test_loader(data_dir, batch_size, num_workers=4, pin_memory=False):
     )
 
     return data_loader
+
+def get_train_table_loader(data_dir, batch_size, num_workers=4, pin_memory=False):
+    """It's as `get_test_loader` but it actually takes training data.
+    """
+    # define transforms
+    normalize = transforms.Normalize((0.1307,), (0.3081,))
+    trans = transforms.Compose([transforms.ToTensor(), normalize])
+
+    # load dataset
+    dataset = datasets.MNIST(data_dir, train=True, download=True, transform=trans)
+
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+
+    return data_loader
