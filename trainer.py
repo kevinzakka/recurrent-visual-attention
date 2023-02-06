@@ -496,7 +496,6 @@ class Trainer:
         end once the model has finished training.
         """
         correct = 0
-        correct_each_glimpse = 0
 
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
@@ -600,13 +599,13 @@ class Trainer:
             phi = retina.foveate(x, l_t)
             
             for t in range(self.num_glimpses - 1):
-                closest_outputs = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
+                closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device)
 
                 h_t = closest_outputs[:, :64]
                 l_t = closest_outputs[:, 64:66].long()
                 phi = retina.foveate(x, l_t)
 
-            closest_outputs = torch.from_numpy(closest_result('output.csv', phi, h_t, l_t))
+            closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device)
 
             pred = closest_outputs[:, 66]
             
