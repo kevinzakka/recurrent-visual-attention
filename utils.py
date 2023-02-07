@@ -1,5 +1,6 @@
 import os, errno
 import json
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -179,7 +180,12 @@ def silent_file_remove(filename):
             raise # re-raise exception if a different error occurred
 
 
-def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor, device) -> torch.Tensor:
+def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor, device, a: float, b: float, c: float) -> torch.Tensor:
+    # Check if the weights for the Euclidean distance make sense
+    if a+b+c <= 0:
+        print("Error: The weights a, b, and c must sum up to a number greater than zero")
+        sys.exit(1)
+
     # Load the data from the csv file into a pandas dataframe
     df = pd.read_csv(csv_file)
     
@@ -197,7 +203,7 @@ def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: tor
     l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).pow(2).sum(dim=-1)
     
     # Calculate the total difference for each row for each tensor
-    diff = p_diff + h_diff + l_diff
+    diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)
     
     # Find the index of the row with the minimum difference for each tensor
     min_index = diff.argmin(dim=-1)

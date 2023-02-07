@@ -573,7 +573,7 @@ class Trainer:
             )
         )
 
-    def memory_based_inference(self):
+    def memory_based_inference(self, a=1.0, b=1.0, c=1.0):
         """Test the RAM model.
 
         This function should only be called at the very
@@ -599,13 +599,13 @@ class Trainer:
             phi = retina.foveate(x, l_t)
             
             for t in range(self.num_glimpses - 1):
-                closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device)
+                closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device, a, b, c)
 
                 h_t = closest_outputs[:, :64]
                 l_t = closest_outputs[:, 64:66].long()
                 phi = retina.foveate(x, l_t)
 
-            closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device)
+            closest_outputs = closest_result('output.csv', phi, h_t, l_t, self.device, a, b, c)
 
             pred = closest_outputs[:, 66]
             
@@ -621,6 +621,8 @@ class Trainer:
                 correct, self.num_test, perc, error
             )
         )
+
+        return perc
 
     def save_checkpoint(self, state, is_best):
         """Saves a checkpoint of the model.

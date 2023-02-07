@@ -95,6 +95,9 @@ train_arg.add_argument(
     "--mem_based_inference", type=str2bool, default=False, help="Test with memory based inference"
 )
 train_arg.add_argument(
+    "--bo", type=str2bool, default=False, help="Apply BO to memory based inference"
+)
+train_arg.add_argument(
     "--momentum", type=float, default=0.5, help="Nesterov momentum value"
 )
 train_arg.add_argument(
