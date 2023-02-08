@@ -54,7 +54,7 @@ def main(config):
         trainer.prepare_training_table()
     elif config.mem_based_inference:
         if config.bo:
-            BO(trainer)
+            trainer.BO()
         else:
             trainer.memory_based_inference()
     else:
@@ -63,23 +63,6 @@ def main(config):
         trainer.test()
         end_test = time.time()
         print("Test time: ", end_test-start_test)
-
-def BO(trainer: Trainer):
-    # Bounded region of parameter space
-    pbounds = {'a': (1.0, 100.0), 'b': (1.0, 100.0), 'c': (1.0, 100.0)}
-
-    optimizer = BayesianOptimization(
-        f=trainer.memory_based_inference,
-        pbounds=pbounds,
-        random_state=1,
-    )
-
-    optimizer.maximize(
-        init_points=8,
-        n_iter=5,
-    )
-
-    print(optimizer.max)
 
 
 if __name__ == "__main__":

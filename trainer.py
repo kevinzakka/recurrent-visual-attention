@@ -2,6 +2,7 @@ import os
 import time
 import shutil
 import pickle
+from bayes_opt import BayesianOptimization
 import numpy as np
 import pandas as pd
 
@@ -623,6 +624,23 @@ class Trainer:
         )
 
         return perc
+    
+    def BO(self):
+        # Bounded region of parameter space
+        pbounds = {'a': (1.0, 100.0), 'b': (1.0, 100.0), 'c': (1.0, 100.0)}
+
+        optimizer = BayesianOptimization(
+            f=self.memory_based_inference,
+            pbounds=pbounds,
+            random_state=1,
+        )
+
+        optimizer.maximize(
+            init_points=8,
+            n_iter=10,
+        )
+
+        print(optimizer.max)
 
     def save_checkpoint(self, state, is_best):
         """Saves a checkpoint of the model.
