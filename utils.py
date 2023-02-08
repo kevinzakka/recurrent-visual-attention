@@ -198,9 +198,10 @@ def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: tor
     phi_arr = data[:, 66:114]
     
     # Calculate the difference between the target values and the values in each row for each tensor
-    p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).pow(2).sum(dim=-1)
-    h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).pow(2).sum(dim=-1)
-    l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).pow(2).sum(dim=-1)
+    p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).abs().sum(dim=-1)
+    h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).abs().sum(dim=-1)
+    l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().sum(dim=-1)
+
     
     # Calculate the total difference for each row for each tensor
     diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)

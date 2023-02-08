@@ -636,8 +636,8 @@ class Trainer:
         )
 
         optimizer.maximize(
-            init_points=8,
-            n_iter=10,
+            init_points=5,
+            n_iter=5,
         )
 
         print(optimizer.max)
