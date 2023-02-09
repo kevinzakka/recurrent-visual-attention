@@ -180,14 +180,14 @@ def silent_file_remove(filename):
             raise # re-raise exception if a different error occurred
 
 
-def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor, device, a: float, b: float, c: float) -> torch.Tensor:
+def closest_result_all_coeff(config, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor, device, a: float, b: float, c: float, d: float, e:float, f: float) -> torch.Tensor:
     # Check if the weights for the Euclidean distance make sense
     if a+b+c <= 0:
         print("Error: The weights a, b, and c must sum up to a number greater than zero")
         sys.exit(1)
 
     # Load the data from the csv file into a pandas dataframe
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(config.output_csv)
     
     # Convert the dataframe to a tensor
     data = torch.tensor(df.values, dtype=torch.float32).to(device)
@@ -198,11 +198,15 @@ def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: tor
     phi_arr = data[:, 66:114]
     
     # Calculate the difference between the target values and the values in each row for each tensor
-    p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).abs().sum(dim=-1)
-    h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).abs().sum(dim=-1)
-    l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().sum(dim=-1)
+    if config.manhattan:
+        p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).abs().pow(d).sum(dim=-1)
+        h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).abs().pow(e).sum(dim=-1)
+        l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().pow(f).sum(dim=-1)
+    else:
+        p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).pow(2*d).sum(dim=-1)
+        h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).pow(2*e).sum(dim=-1)
+        l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).pow(2*f).sum(dim=-1)
 
-    
     # Calculate the total difference for each row for each tensor
     diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)
     
@@ -214,6 +218,43 @@ def closest_result(csv_file: str, p_t: torch.Tensor, h_t: torch.Tensor, l_t: tor
     
     return closest_outputs
 
+def closest_result_not_all_coeff(config, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tensor, device, a: float, b: float, c: float) -> torch.Tensor:
+    # Check if the weights for the Euclidean distance make sense
+    if a+b+c <= 0:
+        print("Error: The weights a, b, and c must sum up to a number greater than zero")
+        sys.exit(1)
+
+    # Load the data from the csv file into a pandas dataframe
+    df = pd.read_csv(config.output_csv)
+    
+    # Convert the dataframe to a tensor
+    data = torch.tensor(df.values, dtype=torch.float32).to(device)
+    
+    # Extract the first three tensors for each row into separate tensors
+    h_arr = data[:, :64]
+    l_arr = data[:, 64:66]
+    phi_arr = data[:, 66:114]
+    
+    # Calculate the difference between the target values and the values in each row for each tensor
+    if config.manhattan:
+        p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).abs().sum(dim=-1)
+        h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).abs().sum(dim=-1)
+        l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().sum(dim=-1)
+    else:
+        p_diff = (p_t.unsqueeze(1) - phi_arr.unsqueeze(0)).pow(2).sum(dim=-1)
+        h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).pow(2).sum(dim=-1)
+        l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).pow(2).sum(dim=-1)
+
+    # Calculate the total difference for each row for each tensor
+    diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)
+    
+    # Find the index of the row with the minimum difference for each tensor
+    min_index = diff.argmin(dim=-1)
+    
+    # Create a tensor with the 3 outputs of the closest row (`ht1`, `lt1`, and `a` if present)
+    closest_outputs = data[min_index, 114:]
+    
+    return closest_outputs
 
 
 class RetinaBasedMemoryInference:

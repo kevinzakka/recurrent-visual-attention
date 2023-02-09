@@ -54,9 +54,12 @@ def main(config):
         trainer.prepare_training_table()
     elif config.mem_based_inference:
         if config.bo:
-            trainer.BO()
+            if config.all_coefficients:
+                trainer.BO_all_coeff()
+            else:
+                trainer.BO_not_all_coeff()
         else:
-            trainer.memory_based_inference()
+            trainer.memory_based_inference_not_all_coeff()
     else:
         import time
         start_test = time.time()
