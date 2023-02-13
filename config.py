@@ -169,20 +169,20 @@ misc_arg.add_argument(
 )
 
 # memory based inference params
+train_arg.add_argument(
+    "--mem_based_inference", type=str2bool, default=False, help="Test with memory based inference"
+)
 misc_arg.add_argument(
     "--output_csv", type=str, default="output.csv", help="Training data to take into consideration"
 )
 misc_arg.add_argument(
     "--manhattan", type=str2bool, default=True, help="Using manhattan (true) or euclidean (false)"
 )
-misc_arg.add_argument(
-    "--all_coefficients", type=str2bool, default=False, help="Using all coefficients (abcdef) or only abc"
-)
-train_arg.add_argument(
-    "--mem_based_inference", type=str2bool, default=False, help="Test with memory based inference"
-)
 train_arg.add_argument(
     "--bo", type=str2bool, default=False, help="Apply BO to memory based inference"
+)
+misc_arg.add_argument(
+    "--all_coefficients", type=str2bool, default=False, help="Using all coefficients (abcdef) or only abc"
 )
 
 # quantization params
