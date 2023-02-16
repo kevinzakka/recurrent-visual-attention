@@ -491,17 +491,16 @@ class Trainer:
 
     @torch.no_grad()
     def prepare_training_table(self):
-        """Test the RAM model.
-
-        This function should only be called at the very
-        end once the model has finished training.
+        """Inference of the model on the training dataset.
+         
+        In this way, it can build a csv training table for memory-based inference.
         """
         correct = 0
 
         # load the best checkpoint
         self.load_checkpoint(best=self.best)
         
-        csv_filename = self.model_name + ".csv"
+        csv_filename = self.model_name + "_training_table.csv"
         silent_file_remove(os.path.join(self.ckpt_dir, csv_filename))
 
         for i, (x, y) in enumerate(self.test_loader):

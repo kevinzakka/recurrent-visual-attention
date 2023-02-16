@@ -112,3 +112,10 @@ ENV/
 
 # Jupyter
 *.ipynb
+
+# Specific files
+BO_prova.py
+drop_duplicates.py
+training_table_*.csv
+plot_prova.py
+ckpt_1hidden_size_64_newformula/ram_5_4x4_4_3_0_0_2_0_training_table.csv
