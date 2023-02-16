@@ -15,7 +15,7 @@ from tensorboard_logger import configure, log_value
 
 from model import RecurrentAttention
 from modules import Retina
-from utils import AverageMeter, RetinaBasedMemoryInference, closest_result_not_all_coeff, closest_result_all_coeff, silent_file_remove
+from utils import AverageMeter, RetinaBasedMemoryInference, closest_result, silent_file_remove
 
 from utils import denormalize
 
@@ -572,12 +572,11 @@ class Trainer:
                 correct, self.num_test, perc, error
             )
         )
+    
+    def memory_based_inference(self, a=29.98, b=16.08, c=9.93):
+        """Memory-based inference.
 
-    def memory_based_inference_all_coeff(self, a=1.0, b=1.0, c=1.0, d=1.0, e=1.0, f=1.0):
-        """Test the RAM model.
-
-        This function should only be called at the very
-        end once the model has finished training.
+        The default weights are for 50% of the data. TODO: make them general, and maybe better if taken from a saved csv table
         """
         correct = 0
 
@@ -599,13 +598,13 @@ class Trainer:
             phi = retina.foveate(x, l_t)
             
             for t in range(self.num_glimpses - 1):
-                closest_outputs = closest_result_all_coeff(self.config, phi, h_t, l_t, self.device, a, b, c, d, e, f)
+                closest_outputs = closest_result(self.config, phi, h_t, l_t, self.device, a, b, c)
 
                 h_t = closest_outputs[:, :64]
                 l_t = closest_outputs[:, 64:66].long()
                 phi = retina.foveate(x, l_t)
 
-            closest_outputs = closest_result_all_coeff(self.config, phi, h_t, l_t, self.device, a, b, c, d, e, f)
+            closest_outputs = closest_result(self.config, phi, h_t, l_t, self.device, a, b, c)
 
             pred = closest_outputs[:, 66]
             
@@ -623,81 +622,13 @@ class Trainer:
         )
 
         return perc
-    
-    def memory_based_inference_not_all_coeff(self, a=1.0, b=1.0, c=1.0):
-        """Test the RAM model.
 
-        This function should only be called at the very
-        end once the model has finished training.
-        """
-        correct = 0
-
-        # load the best checkpoint
-        self.load_checkpoint(best=self.best)
-
-        for i, (x, y) in enumerate(self.test_loader):
-            x, y = x.to(self.device), y.to(self.device)
-
-            # duplicate M times
-            x = x.repeat(self.M, 1, 1, 1)
-
-            retina = RetinaBasedMemoryInference(self.patch_size, self.num_patches, self.glimpse_scale)
-
-            # initialize location vector and hidden state
-            self.batch_size = x.shape[0]
-            h_t, l_t = self.reset()
-            l_t = denormalize(x.shape[-1], l_t)
-            phi = retina.foveate(x, l_t)
-            
-            for t in range(self.num_glimpses - 1):
-                closest_outputs = closest_result_not_all_coeff(self.config, phi, h_t, l_t, self.device, a, b, c)
-
-                h_t = closest_outputs[:, :64]
-                l_t = closest_outputs[:, 64:66].long()
-                phi = retina.foveate(x, l_t)
-
-            closest_outputs = closest_result_not_all_coeff(self.config, phi, h_t, l_t, self.device, a, b, c)
-
-            pred = closest_outputs[:, 66]
-            
-            correct += pred.eq(y.data.view_as(pred)).cpu().sum()
-
-            print(i)
-
-        perc = (100.0 * correct) / (self.num_test)
-        error = 100 - perc
-
-        print(
-            "[*] Test Acc: {}/{} ({:.2f}% - {:.2f}%)".format(
-                correct, self.num_test, perc, error
-            )
-        )
-
-        return perc
-    
-    def BO_all_coeff(self):
-        # Bounded region of parameter space
-        pbounds = {'a': (1.0, 100.0), 'b': (1.0, 100.0), 'c': (1.0, 100.0), 'd': (1.0, 4.0), 'e': (1.0, 4.0), 'f': (1.0, 4.0)}
-
-        optimizer = BayesianOptimization(
-            f=self.memory_based_inference_all_coeff,
-            pbounds=pbounds,
-            random_state=1,
-        )
-
-        optimizer.maximize(
-            init_points=5,
-            n_iter=5,
-        )
-
-        print(optimizer.max)
-
-    def BO_not_all_coeff(self):
+    def BO(self):
         # Bounded region of parameter space
         pbounds = {'a': (1.0, 100.0), 'b': (1.0, 100.0), 'c': (1.0, 100.0)}
 
         optimizer = BayesianOptimization(
-            f=self.memory_based_inference_not_all_coeff,
+            f=self.memory_based_inference,
             pbounds=pbounds,
             random_state=1,
         )

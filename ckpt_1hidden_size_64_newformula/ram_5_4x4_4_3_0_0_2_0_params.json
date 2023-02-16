@@ -1,6 +1,5 @@
 {
     "M": 1,
-    "all_coefficients": false,
     "batch_size": 128,
     "best": true,
     "bo": false,
@@ -17,7 +16,6 @@
     "loc_hidden": 128,
     "logs_dir": "./logs/",
     "lr_patience": 20,
-    "manhattan": true,
     "mem_based_inference": false,
     "momentum": 0.5,
     "num_bits_g_t": 0,
@@ -27,7 +25,6 @@
     "num_glimpses": 5,
     "num_patches": 3,
     "num_workers": 4,
-    "output_csv": "output.csv",
     "output_size_ht": 64,
     "patch_size": 4,
     "plot_freq": 1,
@@ -38,6 +35,7 @@
     "shuffle": true,
     "std": 0.05,
     "train_patience": 50,
+    "training_table": "training_table.csv",
     "use_gpu": true,
     "use_tensorboard": false,
     "valid_size": 0.1
