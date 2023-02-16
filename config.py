@@ -179,6 +179,11 @@ train_arg.add_argument(
     "--bo", type=str2bool, default=False, help="Apply BO to memory based inference"
 )
 
+# add noise to the memory-based inference to emulate hardware behaviour
+train_arg.add_argument(
+    "--noise_coeff", type=float, default=0.0, help="Apply BO to memory based inference"
+)
+
 # quantization params
 misc_arg.add_argument(
     "--plot_freq", type=int, default=1, help="How frequently to plot glimpses"

@@ -201,6 +201,11 @@ def closest_result(config, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tens
     h_diff = (h_t.unsqueeze(1) - h_arr.unsqueeze(0)).abs().sum(dim=-1)
     l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().sum(dim=-1)
 
+    # Add Gaussian noise to the calculation of the weighted Manhattan distance with mean 0 and standard deviation equal to the noise_coeff
+    p_diff = p_diff + torch.randn(p_diff.shape) * config.noise_coeff
+    h_diff = h_diff + torch.randn(h_diff.shape) * config.noise_coeff
+    l_diff = l_diff + torch.randn(l_diff.shape) * config.noise_coeff
+
     # Calculate the total difference for each row for each tensor
     diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)
     
