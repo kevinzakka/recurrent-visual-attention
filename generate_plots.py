@@ -64,27 +64,26 @@ def parse_csv():
 
     return df
 
-def generate_plot_size_ht(df):
+def generate_plot(df, start_row, end_row, col, x_label, x_ticks, plt_title):
     # filter the rows that you want to compare
-    x_quant_0 = df.iloc[36:54:3]
+    x_quant_0 = df.iloc[start_row : end_row+1 : 3]
     x_quant_0 = x_quant_0.append(df.loc[0])
-    x_quant_0 = x_quant_0.sort_values('size_ht')
+    x_quant_0 = x_quant_0.sort_values(col)
 
-    x_quant_1 = df.iloc[37:54:3]
+    x_quant_1 = df.iloc[start_row+1 : end_row+2 : 3]
     x_quant_1 = x_quant_1.append(df.loc[1])
-    x_quant_1 = x_quant_1.sort_values('size_ht')
+    x_quant_1 = x_quant_1.sort_values(col)
 
-    x_quant_2 = df.iloc[38:54:3]
+    x_quant_2 = df.iloc[start_row+2 : end_row+3 : 3]
     x_quant_2 = x_quant_2.append(df.loc[2])
-    x_quant_2 = x_quant_2.sort_values('size_ht')
+    x_quant_2 = x_quant_2.sort_values(col)
 
     # plot the line chart
-    plt.plot(x_quant_0['size_ht'], x_quant_0['acc'], c='b', label = 'ht not quantized', linewidth = 1, linestyle='-', marker='.')
-    plt.plot(x_quant_1['size_ht'], x_quant_1['acc'], c='r', label = 'ht quantized 1', linewidth = 1, linestyle='-', marker='.')
-    plt.plot(x_quant_2['size_ht'], x_quant_2['acc'], c='g', label = 'ht 1uantized 2', linewidth = 1, linestyle='-', marker='.')
+    plt.plot(x_quant_0[col], x_quant_0['acc'], c='b', label = 'ht not quantized', linewidth = 1, linestyle='-', marker='.')
+    plt.plot(x_quant_1[col], x_quant_1['acc'], c='r', label = 'ht quantized 1', linewidth = 1, linestyle='-', marker='.')
+    plt.plot(x_quant_2[col], x_quant_2['acc'], c='g', label = 'ht 1uantized 2', linewidth = 1, linestyle='-', marker='.')
 
-    plt.xlabel('size ht')
-    x_ticks = list(range(16,129,16))
+    plt.xlabel(x_label)
     plt.xticks(x_ticks)
     plt.ylabel('Accuracy [%]')
     plt.ylim(0.65, 1.00)
@@ -92,7 +91,7 @@ def generate_plot_size_ht(df):
     plt.grid(True, linewidth=0.5, color='gray', linestyle=':')
     plt.legend(fontsize=10)
 
-    plt.title('Comparison of accuracy for different size_ht values')
+    plt.title(plt_title)
 
 
     # SAVE GRAPH IN PDF
@@ -104,6 +103,7 @@ def generate_plot_size_ht(df):
     dir_name = '-'.join(parts[:])   # Join the parts back into a string with the directory name
 
     parts[0] = "graph"    # Modify the desired part
+    parts.append(col)
     graph_name = '-'.join(parts[:]) + '.pdf'  # create new filename with new extension
 
     if not os.path.exists(dir_name):
@@ -115,6 +115,21 @@ def generate_plot_size_ht(df):
 
 df = parse_csv()
 
-plt = generate_plot_size_ht(df)
+plt = generate_plot(df=df, 
+                    start_row=36, 
+                    end_row=53, 
+                    col='size_ht',
+                    x_label='size ht',
+                    x_ticks=list(range(16,129,16)), 
+                    plt_title='Comparison of accuracy for different size_ht values')
+plt.show()
+plt.clf()
 
+plt = generate_plot(df=df, 
+                    start_row=6, 
+                    end_row=11, 
+                    col='num_glimpses', 
+                    x_label='num glimpses', 
+                    x_ticks=[5,10,15,20], 
+                    plt_title='Comparison of accuracy for different num glimpses values')
 plt.show()
