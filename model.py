@@ -17,7 +17,7 @@ class RecurrentAttention(nn.Module):
     """
 
     def __init__(
-        self, g, k, s, c, h_g, h_l, std, hidden_size, output_size_ht, num_classes, quant_bits_g_t, quant_bits_h_t, quant_bits_phi, quant_bits_lt
+        self, g, k, s, c, h_g, h_l, std, hidden_size, output_size_ht, num_classes, quant_bits_g_t, quant_bits_h_t, quant_bits_phi, quant_bits_lt, config, model_name
     ):
         """Constructor.
 
@@ -38,7 +38,7 @@ class RecurrentAttention(nn.Module):
 
         self.std = std
 
-        self.sensor = modules.GlimpseNetwork(h_g, h_l, g, k, s, c, quant_bits_g_t, quant_bits_phi, quant_bits_lt)
+        self.sensor = modules.GlimpseNetwork(h_g, h_l, g, k, s, c, quant_bits_g_t, quant_bits_phi, quant_bits_lt, config, model_name)
         self.rnn = modules.CoreNetwork(h_g + h_l, hidden_size, output_size_ht, quant_bits_h_t)
         self.locator = modules.LocationNetwork(output_size_ht, 2, std)
         self.classifier = modules.ActionNetwork(output_size_ht, num_classes)

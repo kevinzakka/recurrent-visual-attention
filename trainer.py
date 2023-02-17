@@ -140,7 +140,9 @@ class Trainer:
             self.quant_bits_g_t,
             self.quant_bits_h_t,
             self.quant_bits_phi,
-            self.quant_bits_lt
+            self.quant_bits_lt,
+            self.config,
+            self.model_name
         )
         self.model.to(self.device)
 

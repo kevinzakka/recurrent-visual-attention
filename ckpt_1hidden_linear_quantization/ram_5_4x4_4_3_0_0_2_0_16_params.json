@@ -12,7 +12,7 @@
     "init_lr": 0.0003,
     "is_train": true,
     "is_train_table": false,
-    "load_ckpt": "",
+    "load_ckpt": "5_4x4_4_3_0_0_2_0_16",
     "loc_hidden": 128,
     "logs_dir": "./logs/",
     "lr_patience": 20,
@@ -37,7 +37,7 @@
     "std": 0.05,
     "train_patience": 50,
     "training_table": "training_table.csv",
-    "use_gpu": true,
+    "use_gpu": false,
     "use_tensorboard": false,
     "valid_size": 0.1
 }

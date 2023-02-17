@@ -1,3 +1,5 @@
+import os
+import re
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -149,12 +151,14 @@ class GlimpseNetwork(nn.Module):
             timestep `t`.
     """
 
-    def __init__(self, h_g, h_l, g, k, s, c, quant_bits_gt, quant_bits_phi, quant_bits_lt):
+    def __init__(self, h_g, h_l, g, k, s, c, quant_bits_gt, quant_bits_phi, quant_bits_lt, config, model_name):
         super().__init__()
 
         self.quant_bits_gt = quant_bits_gt
         self.quant_bits_phi = quant_bits_phi
         self.quant_bits_lt = quant_bits_lt
+        self.config = config
+        self.model_name = model_name
 
         self.retina = Retina(g, k, s)
 
@@ -178,9 +182,16 @@ class GlimpseNetwork(nn.Module):
 
         # Quantize phi
         if self.quant_bits_phi > 0:
-            phi = torch.clamp(phi, min=-0.4242, max=2.8215)
-            phi = quantize_tensor(phi, self.quant_bits_phi, min_t=-0.4242, max_t=2.8215)
-            # phi = quantize_tensor(phi, self.quant_bits_phi)
+            if self.config.is_train:
+                phi = quantize_tensor(phi, self.quant_bits_phi)
+            else:
+                txt_filename = self.model_name + "_phi_max_min.txt"
+                with open(os.path.join(self.config.ckpt_dir, txt_filename), 'r') as file:
+                    phi_max = float(re.search(r'tensor\(([-\d\.]+)\)', file.readline()).group(1))
+                    phi_min = float(re.search(r'tensor\(([-\d\.]+)\)', file.readline()).group(1))
+                    
+                phi = torch.clamp(phi, min=phi_min, max=phi_max)
+                phi = quantize_tensor(phi, self.quant_bits_phi, min_t=phi_min, max_t=phi_max)
 
         # feed phi and l to respective fc layers
         phi_out = F.relu(self.fc1(phi))
