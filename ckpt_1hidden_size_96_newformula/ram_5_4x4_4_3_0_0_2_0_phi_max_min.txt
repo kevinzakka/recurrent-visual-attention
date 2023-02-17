@@ -1,2 +1,0 @@
-phi_max: tensor(2.8215)
-phi_min: tensor(-0.4242)

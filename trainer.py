@@ -96,7 +96,7 @@ class Trainer:
         self.load_ckpt = config.load_ckpt
 
         if config.is_train or self.load_ckpt == "":
-            self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}_{}".format(
+            self.model_name = "ram_{}_{}x{}_{}_{}_{}_{}_{}_{}_{}".format(
                 config.num_glimpses,
                 config.patch_size,
                 config.patch_size,
@@ -105,7 +105,8 @@ class Trainer:
                 config.num_bits_g_t,
                 config.num_bits_h_t,
                 config.num_bits_phi,
-                config.num_bits_lt
+                config.num_bits_lt,
+                config.output_size_ht
             )
         else:
             self.model_name = "ram_{}".format(
