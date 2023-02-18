@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import argparse
 
@@ -64,7 +65,7 @@ def parse_csv():
 
     return df
 
-def generate_plot(df, start_row, end_row, col, x_label, x_ticks, plt_title):
+def generate_plot_num_axis(df, start_row, end_row, col, x_label, x_ticks, plt_title):
     # filter the rows that you want to compare
     x_quant_0 = df.iloc[start_row : end_row+1 : 3]
     x_quant_0 = x_quant_0.append(df.loc[0])
@@ -113,9 +114,59 @@ def generate_plot(df, start_row, end_row, col, x_label, x_ticks, plt_title):
 
     return plt
 
+def generate_plot_string_axis(df, start_row, end_row, col, x_label, plt_title):
+    # filter the rows that you want to compare
+    x_quant_0 = df.iloc[start_row : end_row+1 : 3]
+    x_quant_0 = x_quant_0.append(df.loc[0])
+    x_quant_0 = x_quant_0.sort_values(col)
+
+    x_quant_1 = df.iloc[start_row+1 : end_row+2 : 3]
+    x_quant_1 = x_quant_1.append(df.loc[1])
+    x_quant_1 = x_quant_1.sort_values(col)
+
+    x_quant_2 = df.iloc[start_row+2 : end_row+3 : 3]
+    x_quant_2 = x_quant_2.append(df.loc[2])
+    x_quant_2 = x_quant_2.sort_values(col)
+
+    # plot the line chart
+    plt.plot(np.arange(len(x_quant_0[col])), x_quant_0['acc'], c='b', label = 'ht not quantized', linewidth = 1, linestyle='-', marker='.')
+    plt.plot(np.arange(len(x_quant_1[col])), x_quant_1['acc'], c='r', label = 'ht quantized 1', linewidth = 1, linestyle='-', marker='.')
+    plt.plot(np.arange(len(x_quant_2[col])), x_quant_2['acc'], c='g', label = 'ht 1uantized 2', linewidth = 1, linestyle='-', marker='.')
+
+    plt.xlabel(x_label)
+    plt.xticks(np.arange(len(x_quant_0[col])), x_quant_0[col])
+    plt.ylabel('Accuracy [%]')
+    plt.ylim(0.65, 1.00)
+    plt.yticks([5*i/100 + 0.70 for i in range(6)])
+    plt.grid(True, linewidth=0.5, color='gray', linestyle=':')
+    plt.legend(fontsize=10)
+
+    plt.title(plt_title)
+
+
+    # SAVE GRAPH IN PDF
+    filename = os.path.basename(file_path) # Extract filename
+    root, ext = os.path.splitext(filename)  # split filename and extension
+    parts = root.split('-')    # Split filename into components
+
+    parts[0] = "graphs"    # Modify the desired part
+    dir_name = '-'.join(parts[:])   # Join the parts back into a string with the directory name
+
+    parts[0] = "graph"    # Modify the desired part
+    parts.append(col)
+    graph_name = '-'.join(parts[:]) + '.pdf'  # create new filename with new extension
+
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+    plt.savefig(os.path.join(dir_name, graph_name), bbox_inches='tight',dpi=300)
+
+    return plt
+
+
 df = parse_csv()
 
-plt = generate_plot(df=df, 
+plt = generate_plot_num_axis(df=df, 
                     start_row=36, 
                     end_row=53, 
                     col='size_ht',
@@ -125,11 +176,98 @@ plt = generate_plot(df=df,
 plt.show()
 plt.clf()
 
-plt = generate_plot(df=df, 
-                    start_row=6, 
-                    end_row=11, 
-                    col='num_glimpses', 
-                    x_label='num glimpses', 
-                    x_ticks=[5,10,15,20], 
-                    plt_title='Comparison of accuracy for different num glimpses values')
+plt = generate_plot_num_axis(df=df, 
+                            start_row=6, 
+                            end_row=11, 
+                            col='num_glimpses', 
+                            x_label='num glimpses', 
+                            x_ticks=[5,10,15,20], 
+                            plt_title='Comparison of accuracy for different num glimpses values')
 plt.show()
+plt.clf()
+
+plt = generate_plot_string_axis(df=df, 
+                                start_row=12, 
+                                end_row=20, 
+                                col='patch_size', 
+                                x_label='patch size', 
+                                plt_title='Comparison of accuracy for different patch size values')
+plt.show()
+plt.clf()
+
+plt = generate_plot_num_axis(df=df, 
+                            start_row=21, 
+                            end_row=29, 
+                            col='glimpse_scale', 
+                            x_label='glimpse scale', 
+                            x_ticks=[2,3,4,5], 
+                            plt_title='Comparison of accuracy for different glimpse scale values')
+plt.show()
+plt.clf()
+
+plt = generate_plot_num_axis(df=df, 
+                    start_row=30, 
+                    end_row=35, 
+                    col='num_patches', 
+                    x_label='num patches', 
+                    x_ticks=[2,3,4], 
+                    plt_title='Comparison of accuracy for different patches number values')
+plt.show()
+plt.clf()
+
+plt = generate_plot_num_axis(df=df, 
+                    start_row=54, 
+                    end_row=65, 
+                    col='phi_train', 
+                    x_label='patch quantization', 
+                    x_ticks=[1,2,3,4,5,6,7,8], 
+                    plt_title='Comparison of accuracy for different patch quantization values')
+plt.show()
+plt.clf()
+
+def generate_plot_hidden_quant(df, col, x_label, x_ticks, plt_title):
+    # filter the rows that you want to compare
+    x_quant_0 = df.iloc[0:6]
+
+    # plot the line chart
+    plt.plot(x_quant_0[col], x_quant_0['acc'], c='b', linewidth = 1, linestyle='-', marker='.')
+
+    plt.xlabel(x_label)
+    plt.xticks(x_ticks)
+    plt.ylabel('Accuracy [%]')
+    plt.ylim(0.65, 1.00)
+    plt.yticks([5*i/100 + 0.70 for i in range(6)])
+    plt.grid(True, linewidth=0.5, color='gray', linestyle=':')
+    plt.legend(fontsize=10)
+
+    plt.title(plt_title)
+
+
+    # SAVE GRAPH IN PDF
+    filename = os.path.basename(file_path) # Extract filename
+    root, ext = os.path.splitext(filename)  # split filename and extension
+    parts = root.split('-')    # Split filename into components
+
+    parts[0] = "graphs"    # Modify the desired part
+    dir_name = '-'.join(parts[:])   # Join the parts back into a string with the directory name
+
+    parts[0] = "graph"    # Modify the desired part
+    parts.append(col)
+    graph_name = '-'.join(parts[:]) + '.pdf'  # create new filename with new extension
+
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+    plt.savefig(os.path.join(dir_name, graph_name), bbox_inches='tight',dpi=300)
+
+    return plt
+
+plt = generate_plot_hidden_quant(df=df,
+                                 col='ht_test',
+                                 x_label='ht quantization',
+                                 x_ticks=[0,1,2,3,4,5,6,7,8],
+                                 plt_title='Comparison of accuracy for different hidden vector quant values'
+                                 )
+                                 
+plt.show()
+plt.clf()
