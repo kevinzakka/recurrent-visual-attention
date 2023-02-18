@@ -119,3 +119,4 @@ drop_duplicates.py
 training_table_*.csv
 plot_prova.py
 ckpt_1hidden_linear_quantization/*_training_table.csv
+prova.py
