@@ -1,5 +1,6 @@
 import os, errno
 import json
+import re
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -203,9 +204,9 @@ def closest_result(config, p_t: torch.Tensor, h_t: torch.Tensor, l_t: torch.Tens
     l_diff = (l_t.unsqueeze(1) - l_arr.unsqueeze(0)).abs().sum(dim=-1)
 
     # Add Gaussian noise to the calculation of the weighted Manhattan distance with mean 0 and standard deviation equal to the noise_coeff
-    p_diff = p_diff + torch.randn(p_diff.shape) * config.noise_coeff
-    h_diff = h_diff + torch.randn(h_diff.shape) * config.noise_coeff
-    l_diff = l_diff + torch.randn(l_diff.shape) * config.noise_coeff
+    p_diff = p_diff + torch.randn(p_diff.shape).to(device) * config.noise_coeff
+    h_diff = h_diff + torch.randn(h_diff.shape).to(device) * config.noise_coeff
+    l_diff = l_diff + torch.randn(l_diff.shape).to(device) * config.noise_coeff
 
     # Calculate the total difference for each row for each tensor
     diff = (a*p_diff + b*h_diff + c*l_diff) / (a+b+c)
@@ -246,10 +247,13 @@ class RetinaBasedMemoryInference:
             foveated glimpse of the image.
     """
 
-    def __init__(self, g, k, s):
+    def __init__(self, g, k, s, quant_bits_phi, config, model_name):
         self.g = g
         self.k = k
         self.s = s
+        self.quant_bits_phi = quant_bits_phi
+        self.config = config
+        self.model_name = model_name
 
     def foveate(self, x, l):
         """Extract `k` square patches of size `g`, centered
@@ -277,6 +281,16 @@ class RetinaBasedMemoryInference:
         # concatenate into a single tensor and flatten
         phi = torch.cat(phi, 1)
         phi = phi.view(phi.shape[0], -1)    #phi becomes a tensor of B batches with size*size elements
+
+        # Quantize phi
+        if self.quant_bits_phi > 0:
+            txt_filename = self.model_name + "_phi_max_min.txt"
+            with open(os.path.join(self.config.ckpt_dir, txt_filename), 'r') as file:
+                phi_max = float(re.search(r'tensor\(([-\d\.]+)\)', file.readline()).group(1))
+                phi_min = float(re.search(r'tensor\(([-\d\.]+)\)', file.readline()).group(1))
+                
+            phi = torch.clamp(phi, min=phi_min, max=phi_max)
+            phi = quantize_tensor(phi, self.quant_bits_phi, min_t=phi_min, max_t=phi_max)
 
         return phi
 
