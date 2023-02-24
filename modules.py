@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -84,7 +85,7 @@ class Retina:
         end = start + size
 
         # pad with zeros
-        x = F.pad(x, (size // 2, size // 2, size // 2, size // 2))
+        x = F.pad(x, (math.ceil(size/2), math.ceil(size/2), math.ceil(size/2), math.ceil(size/2)))
 
         # loop through mini-batch and extract patches
         patch = []
